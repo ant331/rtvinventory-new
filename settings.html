@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RTV Inventory Hub | Settings</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary: #2563eb;
@@ -264,6 +266,14 @@
         .danger-zone .card-header { background-color: #fee2e2; }
         .danger-zone .card-header h3 { color: #b91c1c; }
         .danger-zone p { margin-bottom: 1rem; color: #b91c1c; }
+        
+        /* Bulk Upload Preview */
+        #upload-preview {
+            max-height: 200px; overflow-y: auto; border: 1px solid var(--border);
+            padding: 10px; margin-top: 15px; margin-bottom: 15px; border-radius: 8px;
+        }
+        #upload-preview table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        #upload-preview th, #upload-preview td { padding: 8px; border: 1px solid #ddd; text-align: left; }
     </style>
 </head>
 <body>
@@ -355,7 +365,30 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                
+                <div class="card">
+                    <div class="card-header"><h3>Data Collector Accounts</h3></div>
+                    <div class="card-body">
+                         <div class="table-controls">
+                            <div class="search-container">
+                                <input type="text" class="search-input" placeholder="Search data collectors..." id="dataCollectorSearchInput">
+                                <i class="fas fa-search search-icon"></i>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button class="btn btn-primary" id="addDataCollectorBtn"><i class="fas fa-plus"></i> Add Collector</button>
+                                <button class="btn btn-outline" id="bulkUploadCollectorBtn"><i class="fas fa-upload"></i> Bulk Upload</button>
+                            </div>
+                        </div>
+                        <div id="dataCollectorAlert" class="alert"></div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead><tr><th>Collector Info</th><th>Contact Info</th><th>Actions</th></tr></thead>
+                                <tbody id="dataCollectorsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                </div>
 
             <div class="settings-content" id="adminTab">
                 <div class="card">
@@ -476,7 +509,6 @@
             </div>
         </div>
     </div>
-
     <div class="modal" id="fieldOfficerModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -538,6 +570,65 @@
         </div>
     </div>
     
+    <div class="modal" id="dataCollectorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="dataCollectorModalTitle">Add Data Collector</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="dataCollectorForm">
+                    <input type="hidden" id="dataCollectorId">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="dataCollectorName">Full Name *</label>
+                            <input type="text" class="form-control" id="dataCollectorName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataCollectorEmpId">EM_No *</label>
+                            <input type="text" class="form-control" id="dataCollectorEmpId" required placeholder="e.g., DC-001">
+                        </div>
+                        <div class="form-group">
+                            <label for="dataCollectorPhone">Contact Number *</label>
+                            <input type="tel" class="form-control" id="dataCollectorPhone" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataCollectorEmail">Email</label>
+                            <input type="email" class="form-control" id="dataCollectorEmail">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline modal-close">Cancel</button>
+                <button type="submit" form="dataCollectorForm" class="btn btn-primary">Save Collector</button>
+            </div>
+        </div>
+    </div>
+    <div id="bulkUploadCollectorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Bulk Upload Data Collectors</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Upload a CSV or XLSX file. Required columns: <strong>EM_No, Name, Contact</strong>. Optional: <strong>Email</strong>.</p>
+                <div class="form-group">
+                    <label for="collector-file-upload">Choose File</label>
+                    <input type="file" class="form-control" id="collector-file-upload" accept=".csv, .xlsx, .xls">
+                </div>
+                <div id="upload-preview" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <a href="data:text/csv;charset=utf-8,EM_No,Name,Contact,Email%0ADC-DEMO-1,Jane Doe,0700123456,jane.doe@example.com" download="datacollector_template.csv" class="btn btn-outline">
+                    <i class="fas fa-download"></i> Download Template
+                </a>
+                <button type="button" class="btn btn-success" id="confirm-collector-upload" disabled>
+                    <i class="fas fa-check"></i> Process Upload
+                </button>
+            </div>
+        </div>
+    </div>
     <div class="modal" id="deleteModal">
         <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header"><h3>Confirm Deletion</h3><button class="modal-close">&times;</button></div>
@@ -563,6 +654,7 @@
             // --- LOCAL STORAGE KEYS ---
             const SUPERVISORS_KEY = 'supervisors';
             const FIELDOFFICERS_KEY = 'fieldOfficers';
+            const DATACOLLECTORS_KEY = 'dataCollectors'; // New Key
             const DISTRICTS_KEY = 'districts';
             const ADMIN_CREDS_KEY = 'adminCredentials';
 
@@ -584,12 +676,14 @@
 
                 initData(SUPERVISORS_KEY, () => [{ id: Date.now(), name: 'Default Supervisor', empId: 'SUP-001', email: 'sup.kagadi@rtv.org', phone: '0700123456', username: 'sup_kagadi', password: 'password123', district: 'Kagadi', status: 'active' }]);
                 initData(FIELDOFFICERS_KEY, () => [{ id: Date.now() + 1, name: 'Default Field Officer', empId: 'FO-001', email: 'fo.kyenjojo@rtv.org', phone: '0700654321', username: 'fo_kyenjojo', password: 'password123', district: 'Kyenjojo', status: 'active' }]);
+                initData(DATACOLLECTORS_KEY, () => [{ id: Date.now() + 2, name: 'Natuha Eve', empId: 'EM132', email: 'natuha@gmail.com', phone: '0700987654'}]);
                 initData(ADMIN_CREDS_KEY, () => ({ username: 'admin', password: 'admin123' }));
 
                 // Initial render of all UI components
                 populateDistrictDropdowns();
                 renderSupervisorsTable();
                 renderFieldOfficersTable();
+                renderDataCollectorsTable(); // New Render
                 renderDistrictsTable();
                 setupEventListeners();
             }
@@ -601,12 +695,7 @@
                 const searchTerm = document.getElementById('supervisorSearchInput').value.toLowerCase();
                 
                 const filtered = supervisors.filter(item => 
-                    item.name.toLowerCase().includes(searchTerm) || 
-                    item.district.toLowerCase().includes(searchTerm) || 
-                    item.username.toLowerCase().includes(searchTerm) ||
-                    item.email.toLowerCase().includes(searchTerm) ||
-                    (item.phone && item.phone.toLowerCase().includes(searchTerm)) ||
-                    (item.empId && item.empId.toLowerCase().includes(searchTerm))
+                    Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm))
                 );
                 
                 tableBody.innerHTML = filtered.map(item => `
@@ -635,12 +724,7 @@
                 const searchTerm = document.getElementById('fieldOfficerSearchInput').value.toLowerCase();
 
                  const filtered = officers.filter(item => 
-                    item.name.toLowerCase().includes(searchTerm) || 
-                    item.district.toLowerCase().includes(searchTerm) || 
-                    item.username.toLowerCase().includes(searchTerm) ||
-                    item.email.toLowerCase().includes(searchTerm) ||
-                    (item.phone && item.phone.toLowerCase().includes(searchTerm)) ||
-                    (item.empId && item.empId.toLowerCase().includes(searchTerm))
+                    Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm))
                 );
 
                 tableBody.innerHTML = filtered.map(item => `
@@ -662,6 +746,35 @@
                     </tr>
                 `).join('') || `<tr><td colspan="5" style="text-align: center;">No field officers found.</td></tr>`;
             }
+
+            // START: NEW RENDER FUNCTION FOR DATA COLLECTORS
+            function renderDataCollectorsTable() {
+                const collectors = getData(DATACOLLECTORS_KEY);
+                const tableBody = document.getElementById('dataCollectorsTableBody');
+                const searchTerm = document.getElementById('dataCollectorSearchInput').value.toLowerCase();
+
+                const filtered = collectors.filter(item => 
+                   Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm))
+                );
+                
+                tableBody.innerHTML = filtered.map(item => `
+                    <tr data-id="${item.id}">
+                        <td>
+                            <div><strong>${item.name}</strong></div>
+                            <small style="color: var(--secondary);">EM_No: ${item.empId}</small>
+                        </td>
+                        <td>
+                            <div>${item.email || 'N/A'}</div>
+                            <small style="color: var(--secondary);">${item.phone || 'N/A'}</small>
+                        </td>
+                        <td class="table-actions">
+                            <button class="btn btn-sm btn-outline edit-datacollector-btn">Edit</button>
+                            <button class="btn btn-sm btn-danger delete-datacollector-btn">Delete</button>
+                        </td>
+                    </tr>
+                `).join('') || `<tr><td colspan="3" style="text-align: center;">No data collectors found.</td></tr>`;
+            }
+            // END: NEW RENDER FUNCTION
 
             function renderDistrictsTable() {
                 const districts = getData(DISTRICTS_KEY).sort();
@@ -698,14 +811,36 @@
                     document.getElementById(this.dataset.tab + 'Tab').classList.add('active');
                 }));
                 document.querySelectorAll('.modal-close').forEach(btn => btn.addEventListener('click', e => e.target.closest('.modal').style.display = 'none'));
+                
+                // Supervisors
                 document.getElementById('addSupervisorBtn').addEventListener('click', () => openUserModal('supervisor'));
                 document.getElementById('supervisorForm').addEventListener('submit', (e) => handleSaveUser(e, 'supervisor'));
                 document.getElementById('supervisorsTableBody').addEventListener('click', (e) => handleTableAction(e, 'supervisor'));
                 document.getElementById('supervisorSearchInput').addEventListener('input', renderSupervisorsTable);
+                
+                // Field Officers
                 document.getElementById('addFieldOfficerBtn').addEventListener('click', () => openUserModal('fieldOfficer'));
                 document.getElementById('fieldOfficerForm').addEventListener('submit', (e) => handleSaveUser(e, 'fieldOfficer'));
                 document.getElementById('fieldOfficersTableBody').addEventListener('click', (e) => handleTableAction(e, 'fieldOfficer'));
                 document.getElementById('fieldOfficerSearchInput').addEventListener('input', renderFieldOfficersTable);
+
+                // START: NEW DATA COLLECTOR LISTENERS
+                document.getElementById('addDataCollectorBtn').addEventListener('click', () => openDataCollectorModal());
+                document.getElementById('dataCollectorForm').addEventListener('submit', handleSaveDataCollector);
+                document.getElementById('dataCollectorsTableBody').addEventListener('click', handleDataCollectorTableAction);
+                document.getElementById('dataCollectorSearchInput').addEventListener('input', renderDataCollectorsTable);
+                document.getElementById('bulkUploadCollectorBtn').addEventListener('click', () => {
+                    const modal = document.getElementById('bulkUploadCollectorModal');
+                    modal.querySelector('form')?.reset();
+                    modal.querySelector('#upload-preview').style.display = 'none';
+                    modal.querySelector('#upload-preview').innerHTML = '';
+                    modal.querySelector('#confirm-collector-upload').disabled = true;
+                    modal.style.display = 'flex';
+                });
+                setupBulkUploadCollector();
+                // END: NEW DATA COLLECTOR LISTENERS
+                
+                // Admin & System
                 document.getElementById('adminPasswordForm').addEventListener('submit', handleAdminPasswordChange);
                 document.querySelectorAll('.toggle-password').forEach(btn => btn.addEventListener('click', togglePasswordVisibility));
                 document.getElementById('addDistrictForm').addEventListener('submit', handleAddDistrict);
@@ -731,13 +866,9 @@
 
                 if (id) {
                     const dataKey = isSupervisor ? SUPERVISORS_KEY : FIELDOFFICERS_KEY;
-                    const user = getData(dataKey).find(u => u.id == id); // Use '==' for type coercion
+                    const user = getData(dataKey).find(u => u.id == id);
 
-                    if (!user) {
-                        console.error(`User with ID ${id} not found for type ${userType}.`);
-                        showAlert(`${userType}Alert`, 'error', `Could not find user data to edit. Please refresh and try again.`);
-                        return;
-                    }
+                    if (!user) return showAlert(`${userType}Alert`, 'error', `Could not find user data to edit.`);
 
                     modalTitle.textContent = `Edit ${isSupervisor ? 'Supervisor' : 'Field Officer'}`;
                     document.getElementById(`${userType}Id`).value = user.id;
@@ -756,16 +887,90 @@
                 } else {
                     modalTitle.textContent = `Add ${isSupervisor ? 'Supervisor' : 'Field Officer'}`;
                     document.getElementById(`${userType}Id`).value = '';
-                    
                     passwordInput.placeholder = 'Enter password';
                     passwordInput.required = true;
                 }
                 document.getElementById(modalId).style.display = 'flex';
             }
 
+            // START: NEW DATA COLLECTOR MODAL/FORM HANDLERS
+            function openDataCollectorModal(id = null) {
+                const modal = document.getElementById('dataCollectorModal');
+                const form = document.getElementById('dataCollectorForm');
+                form.reset();
+                
+                const modalTitle = document.getElementById('dataCollectorModalTitle');
+                
+                if (id) {
+                    const collector = getData(DATACOLLECTORS_KEY).find(c => c.id == id);
+                    if (!collector) return showAlert('dataCollectorAlert', 'error', 'Could not find collector to edit.');
+                    
+                    modalTitle.textContent = 'Edit Data Collector';
+                    document.getElementById('dataCollectorId').value = collector.id;
+                    document.getElementById('dataCollectorName').value = collector.name;
+                    document.getElementById('dataCollectorEmpId').value = collector.empId;
+                    document.getElementById('dataCollectorPhone').value = collector.phone;
+                    document.getElementById('dataCollectorEmail').value = collector.email;
+                } else {
+                    modalTitle.textContent = 'Add Data Collector';
+                    document.getElementById('dataCollectorId').value = '';
+                }
+                modal.style.display = 'flex';
+            }
+
+            function handleSaveDataCollector(e) {
+                e.preventDefault();
+                const id = document.getElementById('dataCollectorId').value;
+                const name = document.getElementById('dataCollectorName').value.trim();
+                const empId = document.getElementById('dataCollectorEmpId').value.trim();
+                const phone = document.getElementById('dataCollectorPhone').value.trim();
+                const email = document.getElementById('dataCollectorEmail').value.trim().toLowerCase();
+                
+                if (!name || !empId || !phone) {
+                    return showAlert('dataCollectorAlert', 'error', 'Please fill all required fields.');
+                }
+
+                let collectors = getData(DATACOLLECTORS_KEY);
+                if (collectors.some(c => c.empId.toLowerCase() === empId.toLowerCase() && c.id != id)) {
+                    return showAlert('dataCollectorAlert', 'error', `EM_No '${empId}' is already in use.`);
+                }
+                
+                const collectorObject = { name, empId, phone, email };
+
+                if (id) { // Editing
+                    const index = collectors.findIndex(c => c.id == id);
+                    if (index > -1) collectors[index] = { ...collectors[index], ...collectorObject };
+                } else { // Adding
+                    collectors.unshift({ id: Date.now(), ...collectorObject });
+                }
+
+                saveData(DATACOLLECTORS_KEY, collectors);
+                renderDataCollectorsTable();
+                document.getElementById('dataCollectorModal').style.display = 'none';
+                showAlert('dataCollectorAlert', 'success', 'Data Collector saved successfully.');
+            }
+
+            function handleDataCollectorTableAction(e) {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                const id = btn.closest('tr').dataset.id;
+                
+                if (btn.classList.contains('edit-datacollector-btn')) {
+                    openDataCollectorModal(id);
+                } else if (btn.classList.contains('delete-datacollector-btn')) {
+                    const collector = getData(DATACOLLECTORS_KEY).find(c => c.id == id);
+                    const deleteCallback = () => {
+                        saveData(DATACOLLECTORS_KEY, getData(DATACOLLECTORS_KEY).filter(item => item.id != id));
+                        renderDataCollectorsTable();
+                        showAlert('dataCollectorAlert', 'success', 'Collector deleted successfully.');
+                    };
+                    openDeleteModal(collector.name, deleteCallback);
+                }
+            }
+            // END: NEW DATA COLLECTOR HANDLERS
+
             function handleSaveUser(e, userType) {
                 e.preventDefault();
-                const form = e.target;
                 const isSupervisor = userType === 'supervisor';
                 const dataKey = isSupervisor ? SUPERVISORS_KEY : FIELDOFFICERS_KEY;
                 const alertId = isSupervisor ? 'supervisorAlert' : 'fieldOfficerAlert';
@@ -780,35 +985,23 @@
                 const district = document.getElementById(`${userType}District`).value;
                 const status = document.getElementById(`${userType}Status`).value;
                 
-                if (!name || !username || !district || !empId || !email) {
-                    return showAlert(alertId, 'error', 'Please fill all required fields.');
-                }
+                if (!name || !username || !district || !empId || !email) return;
                 
                 let allUsers = [...getData(SUPERVISORS_KEY), ...getData(FIELDOFFICERS_KEY)];
-                if (allUsers.some(u => u.username === username && u.id != id)) {
-                     return showAlert(alertId, 'error', `Username '${username}' is already taken.`);
-                }
-                
-                const idLabel = isSupervisor ? 'FS ID' : 'Field Officer ID';
-                if (allUsers.some(u => u.empId === empId && u.id != id)) {
-                     return showAlert(alertId, 'error', `${idLabel} '${empId}' is already in use.`);
-                }
+                if (allUsers.some(u => u.username === username && u.id != id)) return showAlert(alertId, 'error', `Username '${username}' is already taken.`);
+                if (allUsers.some(u => u.empId === empId && u.id != id)) return showAlert(alertId, 'error', `ID '${empId}' is already in use.`);
                 
                 let data = getData(dataKey);
                 const userObject = { name, empId, email, phone, username, district, status };
                 
-                if (id) { // Editing existing user
+                if (id) {
                     const index = data.findIndex(u => u.id == id);
                     if (index > -1) {
                         data[index] = { ...data[index], ...userObject };
-                        if (password) { // Update password only if a new one is provided
-                            data[index].password = password;
-                        }
+                        if (password) data[index].password = password;
                     }
-                } else { // Adding new user
-                    if (!password) {
-                         return showAlert(alertId, 'error', 'Password is required for new users.');
-                    }
+                } else {
+                    if (!password) return showAlert(alertId, 'error', 'Password is required for new users.');
                     data.unshift({ id: Date.now(), ...userObject, password });
                 }
                 
@@ -897,21 +1090,103 @@
 
                 const adminCreds = JSON.parse(localStorage.getItem(ADMIN_CREDS_KEY));
 
-                if (currentPassword !== adminCreds.password) {
-                    return showAlert('adminAlert', 'error', 'Current password does not match.');
-                }
-                if (newPassword.length < 6) {
-                    return showAlert('adminAlert', 'error', 'New password must be at least 6 characters.');
-                }
-                if (newPassword !== confirmNewPassword) {
-                    return showAlert('adminAlert', 'error', 'New passwords do not match.');
-                }
+                if (currentPassword !== adminCreds.password) return showAlert('adminAlert', 'error', 'Current password does not match.');
+                if (newPassword.length < 6) return showAlert('adminAlert', 'error', 'New password must be at least 6 characters.');
+                if (newPassword !== confirmNewPassword) return showAlert('adminAlert', 'error', 'New passwords do not match.');
                 
                 adminCreds.password = newPassword;
                 saveData(ADMIN_CREDS_KEY, adminCreds);
                 showAlert('adminAlert', 'success', 'Admin password updated successfully.');
                 e.target.reset();
             }
+
+            // START: NEW BULK UPLOAD COLLECTOR LOGIC
+            function setupBulkUploadCollector() {
+                const modal = document.getElementById('bulkUploadCollectorModal');
+                const fileInput = document.getElementById('collector-file-upload');
+                const confirmBtn = document.getElementById('confirm-collector-upload');
+                const previewDiv = modal.querySelector('#upload-preview');
+                let parsedData = [];
+
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    previewDiv.style.display = 'block';
+                    previewDiv.innerHTML = '<p>Processing...</p>';
+                    confirmBtn.disabled = true;
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const data = new Uint8Array(event.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                            parsedData = XLSX.utils.sheet_to_json(worksheet);
+                            generatePreview(parsedData);
+                        } catch (err) {
+                            previewDiv.innerHTML = `<p style="color:red;">Error parsing file: ${err.message}</p>`;
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+
+                function generatePreview(data) {
+                    if (!data || data.length === 0) {
+                        previewDiv.innerHTML = '<p style="color:orange;">No data found in file.</p>';
+                        return;
+                    }
+                    const headers = Object.keys(data[0]);
+                    const previewHTML = `
+                        <h4>Preview (${data.length} rows found):</h4>
+                        <table>
+                            <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                            <tbody>${data.slice(0, 5).map(row => `<tr>${headers.map(h => `<td>${row[h] || ''}</td>`).join('')}</tr>`).join('')}</tbody>
+                        </table>
+                        ${data.length > 5 ? `<p>... and ${data.length - 5} more.</p>` : ''}`;
+                    previewDiv.innerHTML = previewHTML;
+                    confirmBtn.disabled = false;
+                }
+
+                confirmBtn.addEventListener('click', () => {
+                    if (parsedData.length === 0) return;
+                    
+                    let collectors = getData(DATACOLLECTORS_KEY);
+                    const existingEmpIds = new Set(collectors.map(c => String(c.empId).toLowerCase()));
+                    let addedCount = 0, skippedCount = 0;
+
+                    parsedData.forEach(row => {
+                        const getVal = (keys) => {
+                            for (const key of keys) { if (row[key]) return row[key]; }
+                            return null;
+                        };
+                        const empId = getVal(['EM_No', 'em_no', 'empId', 'EM No']);
+                        const name = getVal(['Name', 'name']);
+                        const contact = getVal(['Contact', 'contact', 'Phone']);
+                        const email = getVal(['Email', 'email']);
+
+                        if (!empId || !name || !contact) {
+                            skippedCount++;
+                            return;
+                        }
+
+                        if (existingEmpIds.has(String(empId).toLowerCase())) {
+                            skippedCount++;
+                            return;
+                        }
+
+                        collectors.unshift({ id: Date.now() + addedCount, empId, name, phone: contact, email });
+                        existingEmpIds.add(String(empId).toLowerCase());
+                        addedCount++;
+                    });
+                    
+                    saveData(DATACOLLECTORS_KEY, collectors);
+                    showAlert('dataCollectorAlert', 'success', `Added ${addedCount} collectors. Skipped ${skippedCount} (missing data or duplicate EM_No).`);
+                    renderDataCollectorsTable();
+                    modal.style.display = 'none';
+                });
+            }
+            // END: NEW BULK UPLOAD COLLECTOR LOGIC
             
             function togglePasswordVisibility(e) {
                 const button = e.currentTarget;

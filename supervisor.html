@@ -612,8 +612,10 @@
             <form id="assign-form">
                 <input type="hidden" id="assign-item-id">
                 <div class="form-group">
-                    <label for="collector-name">Data Collector Name</label>
-                    <input type="text" class="form-control" id="collector-name" required placeholder="Enter full name">
+                    <label for="collector-select">Data Collector Name</label>
+                    <select class="form-control" id="collector-select" required>
+                        <option value="">-- Select a Collector --</option>
+                    </select>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline modal-close">Cancel</button>
@@ -681,6 +683,7 @@
         const SUPERVISORS_KEY = 'supervisors';
         const INVENTORY_KEY = 'inventoryData';
         const MOVEMENT_LOGS_KEY = 'movementLogs';
+        const DATA_COLLECTORS_KEY = 'dataCollectors'; // <-- NEW KEY
 
         document.addEventListener('DOMContentLoaded', () => {
             initializeSupervisorDashboard();
@@ -688,7 +691,7 @@
         
         // Listen for changes in localStorage to keep data synced across tabs.
         window.addEventListener('storage', (e) => {
-            if ([INVENTORY_KEY, SUPERVISORS_KEY, MOVEMENT_LOGS_KEY].includes(e.key) && currentSupervisor) {
+            if ([INVENTORY_KEY, SUPERVISORS_KEY, MOVEMENT_LOGS_KEY, DATA_COLLECTORS_KEY].includes(e.key) && currentSupervisor) {
                 loadSupervisorData();
                 updateTransferHistory();
             }
@@ -726,6 +729,7 @@
         // --- Data Access Functions ---
         const getSupervisors = () => JSON.parse(localStorage.getItem(SUPERVISORS_KEY)) || [];
         const getInventoryData = () => JSON.parse(localStorage.getItem(INVENTORY_KEY)) || [];
+        const getDataCollectors = () => JSON.parse(localStorage.getItem(DATA_COLLECTORS_KEY)) || [];
         const saveInventoryData = (inventory) => {
             localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
             window.dispatchEvent(new Event('storage'));
@@ -877,6 +881,20 @@
             });
         }
 
+        // NEW: Function to populate data collector dropdowns
+        function populateCollectorDropdown(selectElementId) {
+            const collectors = getDataCollectors();
+            const dropdown = document.getElementById(selectElementId);
+            dropdown.innerHTML = '<option value="">-- Select a Collector --</option>';
+            collectors.sort((a, b) => a.name.localeCompare(b.name));
+            collectors.forEach(collector => {
+                const option = document.createElement('option');
+                option.value = collector.name;
+                option.textContent = `${collector.name} (${collector.empId})`;
+                dropdown.appendChild(option);
+            });
+        }
+
         function setupEventListeners() {
             document.getElementById('logout-btn').addEventListener('click', () => {
                 sessionStorage.removeItem('loggedInUser');
@@ -956,6 +974,7 @@
             }
         }
 
+        // UPDATED: Now populates a dropdown instead of using a text input
         function openAssignModal(itemId, type = 'assign') {
             const item = getInventoryData().find(i => i.id === itemId);
             const modal = document.getElementById('assign-modal');
@@ -963,18 +982,25 @@
                 document.getElementById('assign-modal-title').textContent = type === 'assign' ? 'Assign Item' : 'Transfer Item';
                 document.getElementById('assign-item-name').textContent = `${item.name} (${item.id})`;
                 document.getElementById('assign-item-id').value = item.id;
-                document.getElementById('collector-name').value = '';
-                document.getElementById('collector-name').placeholder = type === 'assign' ? 'Enter new data collector name' : 'Enter name to transfer to';
+                
+                // Populate the dropdown with data collectors
+                populateCollectorDropdown('collector-select');
+                
                 modal.style.display = 'flex';
-                document.getElementById('collector-name').focus();
+                document.getElementById('collector-select').focus();
             }
         }
         
+        // UPDATED: Reads value from the select dropdown
         function handleAssignSubmit(e) {
             e.preventDefault();
             const itemId = document.getElementById('assign-item-id').value;
-            const collectorName = document.getElementById('collector-name').value.trim();
-            if (!collectorName) return;
+            const collectorName = document.getElementById('collector-select').value;
+            
+            if (!collectorName) {
+                showNotification("Please select a data collector.");
+                return;
+            }
 
             let inventory = getInventoryData();
             const itemIndex = inventory.findIndex(i => i.id === itemId);
@@ -1041,6 +1067,7 @@
             }
         }
         
+        // UPDATED: Replaces text input with a dropdown for bulk assignment/transfer
         function openBulkActionModal(actionType) {
             if (!currentSupervisor) { showNotification('Please select a supervisor first.'); return; }
             const modal = document.getElementById('bulk-action-modal');
@@ -1062,7 +1089,15 @@
             
             let contentHTML = '';
             if (actionType === 'assign' || actionType === 'transfer') {
-                contentHTML += `<div class="form-group"><label>Data Collector Name</label><input type="text" class="form-control" id="bulk-collector-name" required></div>`;
+                const collectors = getDataCollectors().sort((a,b) => a.name.localeCompare(b.name));
+                const options = collectors.map(c => `<option value="${c.name}">${c.name} (${c.empId})</option>`).join('');
+                contentHTML += `<div class="form-group">
+                                    <label for="bulk-collector-select">Data Collector Name</label>
+                                    <select class="form-control" id="bulk-collector-select" required>
+                                        <option value="">-- Select a Collector --</option>
+                                        ${options}
+                                    </select>
+                                </div>`;
             }
             contentHTML += `<p>Select items below:</p><div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 0.5rem;">
                 ${config.items.map(item => `<div><input type="checkbox" id="bulk-item-${item.id}" value="${item.id}" style="margin-right:0.5rem;"><label for="bulk-item-${item.id}">${item.name} (${item.id})</label></div>`).join('')}
@@ -1074,6 +1109,7 @@
             modal.dataset.actionType = actionType;
         }
         
+        // UPDATED: Reads value from the new bulk select dropdown
         function handleBulkActionConfirm() {
             const modal = document.getElementById('bulk-action-modal');
             const actionType = modal.dataset.actionType;
@@ -1087,8 +1123,8 @@
             let collectorName = '';
 
             if (actionType === 'assign' || actionType === 'transfer') {
-                collectorName = document.getElementById('bulk-collector-name').value.trim();
-                if (!collectorName) { showNotification('Please enter a data collector name.'); return; }
+                collectorName = document.getElementById('bulk-collector-select').value;
+                if (!collectorName) { showNotification('Please select a data collector.'); return; }
             }
 
             itemIds.forEach(itemId => {

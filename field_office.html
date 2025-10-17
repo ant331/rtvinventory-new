@@ -166,6 +166,17 @@
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
             overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+         .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark);
         }
 
         .card-body {
@@ -449,7 +460,7 @@
             <header class="header">
                 <div class="header-title">
                     <h1>Field Office Dashboard (<span id="district-name"></span>)</h1>
-                    <p>Manage items returned from the field before sending to the central store.</p>
+                    <p>Manage items in storage and prepare them for return to the central store.</p>
                 </div>
                 <div class="header-right">
                     <div class="user-profile">
@@ -471,10 +482,6 @@
             </div>
             
             <div class="quick-actions">
-                <div class="quick-action-btn" id="receive-items-btn">
-                    <i class="fas fa-download"></i>
-                    <span>Receive Items from Field</span>
-                </div>
                 <div class="quick-action-btn" id="return-to-admin-btn">
                     <i class="fas fa-upload"></i>
                     <span>Bulk Return to Admin</span>
@@ -482,25 +489,25 @@
             </div>
             
             <div class="dashboard-grid">
-                <div class="card">
+                <div class="card" style="margin-bottom: 0;">
                     <div class="card-body">
                         <div class="stat-value" id="total-district-items">0</div>
                         <div class="stat-label">Total Items in District</div>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card" style="margin-bottom: 0;">
                     <div class="card-body">
                         <div class="stat-value" id="items-with-supervisors">0</div>
                         <div class="stat-label">Items with Supervisors</div>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card" style="margin-bottom: 0;">
                     <div class="card-body">
                         <div class="stat-value" id="items-in-storage">0</div>
                         <div class="stat-label">Items in Field Storage</div>
                     </div>
                 </div>
-                 <div class="card">
+                 <div class="card" style="margin-bottom: 0;">
                     <div class="card-body">
                         <div class="stat-value" id="items-in-maintenance">0</div>
                         <div class="stat-label">Items Needing Maintenance</div>
@@ -508,21 +515,50 @@
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table class="inventory-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Assigned To</th>
-                            <th>Last Update</th>
-                        </tr>
-                    </thead>
-                    <tbody id="inventory-table-body">
-                    </tbody>
-                </table>
+            <div class="card" id="acknowledgement-card">
+                <div class="card-header">
+                    <h2>Acknowledge Supervisor Returns</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Returned From</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="acknowledgement-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                 <div class="card-header">
+                    <h2>Full District Inventory</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Assigned To</th>
+                                    <th>Last Update</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             
         </main>
@@ -548,13 +584,14 @@
         const INVENTORY_KEY = 'inventoryData';
         const DISTRICTS_KEY = 'districts';
         const MOVEMENT_LOGS_KEY = 'movementLogs';
+        const SUPERVISORS_KEY = 'supervisors'; // Added to find supervisor name
 
         document.addEventListener('DOMContentLoaded', () => {
             initializeFieldOfficeDashboard();
         });
         
         window.addEventListener('storage', (e) => {
-            if (e.key === INVENTORY_KEY || e.key === DISTRICTS_KEY) {
+            if ([INVENTORY_KEY, DISTRICTS_KEY, MOVEMENT_LOGS_KEY, SUPERVISORS_KEY].includes(e.key)) {
                 loadFieldOfficeData();
             }
         });
@@ -586,6 +623,7 @@
                     // If no district was previously selected, clear the view
                     updateStats([]);
                     renderTable([]);
+                    renderAcknowledgementTable([]);
                     document.getElementById('inventory-table-body').innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Please select a field office.</td></tr>';
                 }
             } else if (user.role === 'field_officer') {
@@ -609,6 +647,7 @@
         // --- Data Access Functions ---
         const getInventoryData = () => JSON.parse(localStorage.getItem(INVENTORY_KEY)) || [];
         const getDistricts = () => JSON.parse(localStorage.getItem(DISTRICTS_KEY)) || [];
+        const getSupervisors = () => JSON.parse(localStorage.getItem(SUPERVISORS_KEY)) || [];
         const saveInventoryData = (inventory) => {
             localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
             window.dispatchEvent(new Event('storage'));
@@ -616,10 +655,11 @@
         
         function logMovement(itemId, action, details) {
             let movementLogs = JSON.parse(localStorage.getItem(MOVEMENT_LOGS_KEY)) || [];
+            const actor = JSON.parse(sessionStorage.getItem('loggedInUser')).username;
             movementLogs.unshift({
                 itemId,
                 action,
-                details: `${details} (Action by Field Office: ${currentDistrict})`,
+                details: `${details} (Action by ${actor} at Field Office: ${currentDistrict})`,
                 timestamp: new Date().toISOString()
             });
             localStorage.setItem(MOVEMENT_LOGS_KEY, JSON.stringify(movementLogs));
@@ -663,6 +703,7 @@
             if (!currentDistrict) {
                 updateStats([]);
                 renderTable([]);
+                renderAcknowledgementTable([]);
                 return;
             };
             
@@ -672,6 +713,9 @@
             
             updateStats(districtInventory);
             renderTable(districtInventory);
+            
+            const returnedItems = districtInventory.filter(item => item.status === 'in-storage-field');
+            renderAcknowledgementTable(returnedItems);
         }
 
         function updateStats(districtInventory) {
@@ -714,6 +758,53 @@
             });
         }
         
+        function renderAcknowledgementTable(returnedItems) {
+            const tableBody = document.getElementById('acknowledgement-table-body');
+            const supervisors = getSupervisors();
+            tableBody.innerHTML = '';
+            
+            if (!currentDistrict) {
+                 tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 1.5rem;">Select a district to see returns.</td></tr>';
+                return;
+            }
+            if (returnedItems.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 1.5rem;">No items to acknowledge.</td></tr>';
+                return;
+            }
+
+            const supervisor = supervisors.find(s => s.district.toLowerCase() === currentDistrict) || { name: 'Unknown Supervisor' };
+
+            returnedItems.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${supervisor.name}</td>
+                    <td>
+                        <button class="btn btn-success" data-item-id="${item.id}" onclick="handleAcknowledgeReturn('${item.id}', '${supervisor.name}')">
+                            <i class="fas fa-check-circle"></i> Acknowledge
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        function handleAcknowledgeReturn(itemId, supervisorName) {
+            if (confirm(`Acknowledge receipt of item ${itemId} from ${supervisorName}? This will move it to the 'Return to Admin' queue.`)) {
+                let inventory = getInventoryData();
+                const itemIndex = inventory.findIndex(i => i.id === itemId);
+                if (itemIndex > -1) {
+                    inventory[itemIndex].status = 'pending-approval';
+                    inventory[itemIndex].lastUpdate = new Date().toLocaleDateString();
+                    saveInventoryData(inventory);
+                    logMovement(itemId, 'acknowledge_return', `Item received from Supervisor ${supervisorName} at field office.`);
+                    showNotification(`Item ${itemId} acknowledged and is now pending return to admin.`);
+                    loadFieldOfficeData();
+                }
+            }
+        }
+        
         function setupEventListeners() {
             document.getElementById('logout-btn').addEventListener('click', () => {
                 sessionStorage.removeItem('loggedInUser');
@@ -724,8 +815,7 @@
                 setCurrentDistrict(e.target.value);
             });
             
-            // Connect the quick action buttons to the modal function
-            document.getElementById('receive-items-btn').addEventListener('click', () => openBulkActionModal('receive'));
+            // Connect the quick action button to the modal function
             document.getElementById('return-to-admin-btn').addEventListener('click', () => openBulkActionModal('return_to_admin'));
 
             // General modal close events
@@ -756,25 +846,25 @@
             let title = '';
             let contentHTML = '';
             
-            // Determine which items are eligible for the selected action
-            if (actionType === 'receive') {
-                title = 'Receive Items into Field Storage';
-                contentHTML = `<p>Select items that have been returned by supervisors and are now in your possession. This will move them into local storage.</p>`;
-                itemsForAction = inventory.filter(item => 
-                    item.district && item.district.toLowerCase() === currentDistrict && 
-                    ['in-use', 'available'].includes(item.status) // Can receive items from supervisors that are in use or in their available stock
-                );
-            } else if (actionType === 'return_to_admin') {
+            if (actionType === 'return_to_admin') {
                 title = 'Return Items to Admin (Mbarara Store)';
-                contentHTML = `<p>Select items to send back to the central store. This will put them in a "pending approval" state for the admin.</p>`;
+                // Add driver name input field
+                contentHTML = `
+                    <p>Select items to send back to the central store. This will put them in a "pending approval" state for the admin.</p>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="driver-name">Driver's Name *</label>
+                        <input type="text" id="driver-name" class="form-control" required placeholder="Enter the full name of the driver">
+                    </div>
+                `;
+                // MODIFIED: Can now only return items that have been acknowledged (pending-approval)
                 itemsForAction = inventory.filter(item => 
                     item.district && item.district.toLowerCase() === currentDistrict && 
-                    item.status === 'in-storage-field' // Can only return items that are already in field storage
+                    item.status === 'pending-approval'
                 );
             }
             
             if (itemsForAction.length === 0) {
-                showNotification(`No items are currently eligible for this action.`);
+                showNotification(`No items have been acknowledged and are ready for return.`);
                 return;
             }
 
@@ -805,6 +895,18 @@
                 return;
             }
             
+            // Get and validate driver's name
+            let driverName = '';
+            if (actionType === 'return_to_admin') {
+                const driverInput = document.getElementById('driver-name');
+                driverName = driverInput.value.trim();
+                if (!driverName) {
+                    showNotification("Please enter the driver's name.");
+                    driverInput.focus();
+                    return;
+                }
+            }
+
             const itemIds = checkedItems.map(item => item.value);
             let inventory = getInventoryData();
             let successCount = 0;
@@ -813,28 +915,18 @@
                 const itemIndex = inventory.findIndex(i => i.id === itemId);
                 if (itemIndex > -1) {
                     const item = inventory[itemIndex];
-                    switch(actionType) {
-                        case 'receive':
-                            // Action: Receive an item from the field into local storage
-                            item.status = 'in-storage-field';
-                            item.assigned = ''; // Un-assign from any data collector
-                            item.lastUpdate = new Date().toLocaleDateString();
-                            logMovement(itemId, 'received_at_field_office', `Item moved into ${currentDistrict} field storage.`);
-                            break;
-
-                        case 'return_to_admin':
-                            // Action: Send an item from local storage to the admin for central storage
-                            item.status = 'pending-approval';
-                            item.lastUpdate = new Date().toLocaleDateString();
-                            logMovement(itemId, 'return_to_store', `Item returned from ${currentDistrict} field office to Mbarara store for admin approval.`);
-                            break;
+                    if (actionType === 'return_to_admin') {
+                        // The status is already pending-approval, so we just log the final step
+                        item.lastUpdate = new Date().toLocaleDateString();
+                        // Update log message with driver's name
+                        logMovement(itemId, 'return_to_store', `Item physically sent from ${currentDistrict} via driver: ${driverName}. Awaiting admin receipt.`);
                     }
                     successCount++;
                 }
             });
             
             saveInventoryData(inventory);
-            showNotification(`Successfully processed ${successCount} item(s).`);
+            showNotification(`Successfully processed ${successCount} item(s) for return.`);
             modal.style.display = 'none';
             loadFieldOfficeData(); // Refresh the dashboard view
         }

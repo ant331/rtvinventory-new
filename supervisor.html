@@ -653,6 +653,11 @@
                     <label for="incident-details">Incident Details *</label>
                     <textarea id="incident-details" class="form-control" rows="4" required placeholder="Provide a detailed description of what happened."></textarea>
                 </div>
+                <div class="form-group">
+                    <label for="incident-document">Attach Police Reference (PDF, JPG, PNG)</label>
+                    <input type="file" id="incident-document" class="form-control" accept="application/pdf, image/jpeg, image/png">
+                    <small id="file-chosen" style="margin-top: 5px; color: var(--secondary); display: block;">No file chosen</small>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline modal-close">Cancel</button>
                     <button type="submit" class="btn btn-danger">Submit Report</button>
@@ -944,6 +949,16 @@
             document.getElementById('assign-form').addEventListener('submit', handleAssignSubmit);
             document.getElementById('incident-form').addEventListener('submit', handleIncidentReport);
             document.getElementById('confirm-bulk-action').addEventListener('click', handleBulkActionConfirm);
+            
+            // File input listener for incident report
+            document.getElementById('incident-document').addEventListener('change', function() {
+                const fileChosen = document.getElementById('file-chosen');
+                if (this.files.length > 0) {
+                    fileChosen.textContent = this.files[0].name;
+                } else {
+                    fileChosen.textContent = 'No file chosen';
+                }
+            });
         }
         
         // --- ACTION HANDLERS ---
@@ -1037,19 +1052,27 @@
             if (!currentSupervisor) { showNotification('Please select a supervisor first.'); return; }
             const modal = document.getElementById('incident-modal');
             const itemSelect = document.getElementById('incident-item-select');
+            
             const reportableItems = getInventoryData().filter(item => 
                 item.district && item.district.toLowerCase() === currentSupervisor.district.toLowerCase() &&
-                item.status === 'in-use'
+                ['in-use', 'available'].includes(item.status)
             );
             
             itemSelect.innerHTML = '<option value="">-- Select an Item --</option>';
-            if (reportableItems.length === 0) { showNotification('No items are currently assigned to data collectors to report.'); return; }
+            if (reportableItems.length === 0) { 
+                showNotification('No reportable items (Available or In Use) found in your inventory.'); 
+                return; 
+            }
             reportableItems.forEach(item => {
-                itemSelect.add(new Option(`${item.name} (${item.id}) - Assigned to: ${item.assigned}`, item.id));
+                const displayText = item.status === 'in-use' 
+                    ? `${item.name} (${item.id}) - Assigned to: ${item.assigned}`
+                    : `${item.name} (${item.id}) - Status: Available`;
+                itemSelect.add(new Option(displayText, item.id));
             });
             
             document.getElementById('incident-form').reset();
             document.getElementById('incident-date').max = new Date().toISOString().split("T")[0];
+            document.getElementById('file-chosen').textContent = 'No file chosen';
             modal.style.display = 'flex';
         }
 
@@ -1058,18 +1081,32 @@
             const itemId = document.getElementById('incident-item-select').value;
             const incidentType = document.getElementById('incident-type').value;
             const incidentDetails = document.getElementById('incident-details').value.trim();
+            const incidentDocument = document.getElementById('incident-document').files[0];
+
             if (!itemId || !incidentType || !incidentDetails) { showNotification('Please fill all required fields.', 'error'); return; }
 
             let inventory = getInventoryData();
             const itemIndex = inventory.findIndex(i => i.id === itemId);
             if (itemIndex > -1) {
                 const originalAssignee = inventory[itemIndex].assigned;
+                const originalStatus = inventory[itemIndex].status;
                 inventory[itemIndex].status = 'reported-missing';
                 inventory[itemIndex].assigned = ''; 
                 inventory[itemIndex].lastUpdate = new Date().toLocaleDateString();
                 saveInventoryData(inventory);
                 
-                const logDetail = `Incident Reported: ${incidentType}. Assigned to: ${originalAssignee}. Details: ${incidentDetails}.`;
+                let logDetail = `Incident Reported: ${incidentType}.`;
+                if (originalAssignee) {
+                    logDetail += ` Previously assigned to: ${originalAssignee}.`;
+                } else {
+                    logDetail += ` Previous status was: ${originalStatus}.`;
+                }
+                logDetail += ` Details: ${incidentDetails}.`;
+
+                if (incidentDocument) {
+                    logDetail += ` Attached Document: ${incidentDocument.name}.`;
+                }
+
                 logMovement(itemId, 'incident_report', logDetail);
                 showNotification('Incident report submitted successfully for admin review.');
                 document.getElementById('incident-modal').style.display = 'none';

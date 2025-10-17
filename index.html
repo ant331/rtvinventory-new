@@ -181,6 +181,9 @@
         .notification-item:hover {
             background-color: var(--light);
         }
+        .notification-item.unread {
+            background-color: #eef2ff; /* Pale blue for unread notifications */
+        }
         .notification-icon {
             font-size: 1.2rem;
             color: var(--secondary);
@@ -669,12 +672,17 @@
                 notifications.forEach(notif => {
                     const itemEl = document.createElement('div');
                     itemEl.className = 'notification-item';
+                    itemEl.dataset.id = notif.id;
+
+                    if (!notif.read) {
+                        itemEl.classList.add('unread');
+                    }
 
                     if (notif.type && notif.itemId) {
                         itemEl.dataset.type = notif.type;
                         itemEl.dataset.itemId = notif.itemId;
                         itemEl.style.cursor = 'pointer';
-                        itemEl.title = 'Click to view';
+                        itemEl.title = 'Click to view and mark as read';
                     }
 
                     const icon = notif.message.includes('approval') ? 'fa-inbox' : 'fa-exclamation-triangle';
@@ -938,6 +946,20 @@
                     const notificationItem = e.target.closest('.notification-item');
                     if (!notificationItem) return;
 
+                    // Mark notification as read
+                    const notificationId = notificationItem.dataset.id;
+                    if (notificationId && notificationItem.classList.contains('unread')) {
+                        let notifications = getNotifications();
+                        const notifIndex = notifications.findIndex(n => n.id === notificationId);
+                        if (notifIndex > -1) {
+                            notifications[notifIndex].read = true;
+                            saveNotifications(notifications);
+                            // Re-render the notifications UI to update count and styles immediately
+                            updateNotificationsUI(); 
+                        }
+                    }
+
+                    // Handle navigation logic
                     const type = notificationItem.dataset.type;
                     const itemId = notificationItem.dataset.itemId;
 

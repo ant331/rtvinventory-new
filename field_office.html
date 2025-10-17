@@ -632,7 +632,8 @@
             dropdown.innerHTML = '<option value="">-- Select District --</option>';
             
             districts.sort().forEach(district => {
-                if (district.toLowerCase() !== 'mbarara') { // Field offices are not the central store
+                // Field offices are any district that is not the central store (Mbarara)
+                if (district.toLowerCase() !== 'mbarara') { 
                     const option = document.createElement('option');
                     option.value = district.toLowerCase();
                     option.textContent = district;
@@ -645,7 +646,7 @@
             if (!district) {
                 currentDistrict = null;
                 document.getElementById('district-name').textContent = 'N/A';
-                loadFieldOfficeData(); // This will clear the table
+                loadFieldOfficeData(); 
                 return;
             }
             currentDistrict = district;
@@ -666,6 +667,7 @@
             };
             
             const allInventory = getInventoryData();
+            // Security: Filter all data to only items within the currently selected district.
             const districtInventory = allInventory.filter(item => item.district && item.district.toLowerCase() === currentDistrict);
             
             updateStats(districtInventory);
@@ -674,6 +676,7 @@
 
         function updateStats(districtInventory) {
             document.getElementById('total-district-items').textContent = districtInventory.length;
+            // Items with supervisors are those "in-use" by data collectors or "available" in the supervisor's local stock.
             document.getElementById('items-with-supervisors').textContent = districtInventory.filter(item => ['in-use', 'available'].includes(item.status)).length;
             document.getElementById('items-in-storage').textContent = districtInventory.filter(item => item.status === 'in-storage-field').length;
             document.getElementById('items-in-maintenance').textContent = districtInventory.filter(item => item.status === 'maintenance').length;
@@ -684,12 +687,16 @@
             tableBody.innerHTML = '';
 
             if (items.length === 0) {
-                const message = currentDistrict ? 'No items found in this district.' : 'Please select a field office.';
+                const message = currentDistrict ? 'No items found in this field office.' : 'Please select a field office to view its inventory.';
                 tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;">${message}</td></tr>`;
                 return;
             }
             
-            items.sort((a, b) => a.id.localeCompare(b.id));
+            // Sort items to bring actionable items (e.g., in storage) to the top.
+            items.sort((a, b) => {
+                const statusOrder = { 'in-storage-field': 1, 'in-use': 2, 'available': 3, 'maintenance': 4 };
+                return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99) || a.id.localeCompare(b.id);
+            });
             
             items.forEach(item => {
                 const row = document.createElement('tr');
@@ -717,9 +724,11 @@
                 setCurrentDistrict(e.target.value);
             });
             
+            // Connect the quick action buttons to the modal function
             document.getElementById('receive-items-btn').addEventListener('click', () => openBulkActionModal('receive'));
             document.getElementById('return-to-admin-btn').addEventListener('click', () => openBulkActionModal('return_to_admin'));
 
+            // General modal close events
             document.querySelectorAll('.modal-close').forEach(btn => {
                 btn.addEventListener('click', () => btn.closest('.modal').style.display = 'none');
             });
@@ -728,7 +737,8 @@
                 if(e.target.classList.contains('modal')) e.target.style.display = 'none';
             });
             
-            document.getElementById('confirm-bulk-action').addEventListener('click', handleBulkAction);
+            // Connect the modal's confirm button to its handler function
+            document.getElementById('confirm-bulk-action').addEventListener('click', handleBulkActionConfirm);
         }
         
         function openBulkActionModal(actionType) {
@@ -743,55 +753,49 @@
             
             const inventory = getInventoryData();
             let itemsForAction = [];
+            let title = '';
+            let contentHTML = '';
             
+            // Determine which items are eligible for the selected action
             if (actionType === 'receive') {
+                title = 'Receive Items into Field Storage';
+                contentHTML = `<p>Select items that have been returned by supervisors and are now in your possession. This will move them into local storage.</p>`;
                 itemsForAction = inventory.filter(item => 
                     item.district && item.district.toLowerCase() === currentDistrict && 
-                    ['in-use', 'available'].includes(item.status)
+                    ['in-use', 'available'].includes(item.status) // Can receive items from supervisors that are in use or in their available stock
                 );
             } else if (actionType === 'return_to_admin') {
+                title = 'Return Items to Admin (Mbarara Store)';
+                contentHTML = `<p>Select items to send back to the central store. This will put them in a "pending approval" state for the admin.</p>`;
                 itemsForAction = inventory.filter(item => 
                     item.district && item.district.toLowerCase() === currentDistrict && 
-                    item.status === 'in-storage-field'
+                    item.status === 'in-storage-field' // Can only return items that are already in field storage
                 );
             }
             
             if (itemsForAction.length === 0) {
-                showNotification(`No items available for this action.`);
+                showNotification(`No items are currently eligible for this action.`);
                 return;
             }
-            
-            let title = '';
-            let contentHTML = '';
-            
-            switch(actionType) {
-                case 'receive':
-                    title = 'Receive Items into Field Storage';
-                    contentHTML = `<p>Select items that have been returned by supervisors and are now in your possession.</p>`;
-                    break;
-                case 'return_to_admin':
-                    title = 'Bulk Return Items to Admin';
-                    contentHTML = `<p>Select items to return to the Mbarara central store. This will move them into a "pending approval" state for the admin.</p>`;
-                    break;
-            }
 
+            // Build the list of checkboxes for the modal
             contentHTML += `
                 <div style="max-height: 300px; overflow-y: auto; margin-top: 1rem; border: 1px solid var(--border); padding: 0.5rem; border-radius: 8px;">
                     ${itemsForAction.map(item => `
                         <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
                             <input type="checkbox" id="bulk-item-${item.id}" value="${item.id}" style="margin-right: 0.5rem;">
-                            <label for="bulk-item-${item.id}">${item.name} (${item.id}) - <i>Assigned to: ${item.assigned || 'Supervisor Stock'}</i></label>
+                            <label for="bulk-item-${item.id}">${item.name} (${item.id}) - <i>Current Status: ${item.status.replace('-', ' ')}</i></label>
                         </div>
                     `).join('')}
                 </div>`;
             
             modalTitle.textContent = title;
             modalContent.innerHTML = contentHTML;
+            modal.dataset.actionType = actionType; // Store the action type for the confirm handler
             modal.style.display = 'flex';
-            modal.dataset.actionType = actionType;
         }
         
-        function handleBulkAction() {
+        function handleBulkActionConfirm() {
             const modal = document.getElementById('bulk-action-modal');
             const actionType = modal.dataset.actionType;
             const checkedItems = Array.from(modal.querySelectorAll('input[type="checkbox"]:checked'));
@@ -805,38 +809,34 @@
             let inventory = getInventoryData();
             let successCount = 0;
             
-            switch(actionType) {
-                case 'receive':
-                    itemIds.forEach(itemId => {
-                        const itemIndex = inventory.findIndex(i => i.id === itemId);
-                        if (itemIndex > -1) {
-                            inventory[itemIndex].status = 'in-storage-field';
-                            inventory[itemIndex].assigned = ''; // Unassign from collector/supervisor
-                            inventory[itemIndex].lastUpdate = new Date().toLocaleDateString();
-                            logMovement(itemId, 'received_at_field_office', `Item moved into field storage.`);
-                            successCount++;
-                        }
-                    });
-                    showNotification(`Successfully moved ${successCount} items into field storage.`);
-                    break;
+            itemIds.forEach(itemId => {
+                const itemIndex = inventory.findIndex(i => i.id === itemId);
+                if (itemIndex > -1) {
+                    const item = inventory[itemIndex];
+                    switch(actionType) {
+                        case 'receive':
+                            // Action: Receive an item from the field into local storage
+                            item.status = 'in-storage-field';
+                            item.assigned = ''; // Un-assign from any data collector
+                            item.lastUpdate = new Date().toLocaleDateString();
+                            logMovement(itemId, 'received_at_field_office', `Item moved into ${currentDistrict} field storage.`);
+                            break;
 
-                case 'return_to_admin':
-                    itemIds.forEach(itemId => {
-                        const itemIndex = inventory.findIndex(i => i.id === itemId);
-                        if (itemIndex > -1) {
-                            inventory[itemIndex].status = 'pending-approval';
-                            inventory[itemIndex].lastUpdate = new Date().toLocaleDateString();
-                            logMovement(itemId, 'return_to_store', `Item returned from ${currentDistrict} field office to Mbarara store for approval.`);
-                            successCount++;
-                        }
-                    });
-                    showNotification(`Successfully initiated return for ${successCount} items to the admin store.`);
-                    break;
-            }
+                        case 'return_to_admin':
+                            // Action: Send an item from local storage to the admin for central storage
+                            item.status = 'pending-approval';
+                            item.lastUpdate = new Date().toLocaleDateString();
+                            logMovement(itemId, 'return_to_store', `Item returned from ${currentDistrict} field office to Mbarara store for admin approval.`);
+                            break;
+                    }
+                    successCount++;
+                }
+            });
             
             saveInventoryData(inventory);
+            showNotification(`Successfully processed ${successCount} item(s).`);
             modal.style.display = 'none';
-            loadFieldOfficeData();
+            loadFieldOfficeData(); // Refresh the dashboard view
         }
 
         function showNotification(message) {

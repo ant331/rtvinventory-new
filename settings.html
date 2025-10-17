@@ -644,17 +644,15 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Retrieve logged-in user details from sessionStorage
             const loggedInUser = JSON.parse(sessionStorage.getItem('loggedInUser'));
             
-            // Set up the header with the user's name and avatar
             document.getElementById('user-name').textContent = loggedInUser.username;
             document.getElementById('user-avatar').textContent = loggedInUser.username.charAt(0).toUpperCase();
             
             // --- LOCAL STORAGE KEYS ---
             const SUPERVISORS_KEY = 'supervisors';
             const FIELDOFFICERS_KEY = 'fieldOfficers';
-            const DATACOLLECTORS_KEY = 'dataCollectors'; // New Key
+            const DATACOLLECTORS_KEY = 'dataCollectors';
             const DISTRICTS_KEY = 'districts';
             const ADMIN_CREDS_KEY = 'adminCredentials';
 
@@ -664,26 +662,18 @@
 
             // --- APP INITIALIZATION ---
             function initializeApp() {
-                // Seed database with default data if it doesn't exist
                 const initData = (key, defaultData) => !localStorage.getItem(key) && localStorage.setItem(key, JSON.stringify(defaultData()));
                 
-                initData(DISTRICTS_KEY, () => [
-                    "Amuru", "Gulu", "Isingiro", "Kabale", "Kagadi", "Kaliro", "Kamwengye", 
-                    "Kanungu", "Kibaale", "Kiryandongo", "Kisoro", "Kyegegwa", "Kyenjojo", 
-                    "Luuka", "Mbarara", "Mitooma", "Nwoya", "Rubanda", "Rubirizi", 
-                    "Rukiga", "Rukungiri"
-                ].sort());
-
+                initData(DISTRICTS_KEY, () => ["Amuru", "Gulu", "Isingiro", "Kabale", "Kagadi", "Kaliro", "Kamwengye", "Kanungu", "Kibaale", "Kiryandongo", "Kisoro", "Kyegegwa", "Kyenjojo", "Luuka", "Mbarara", "Mitooma", "Nwoya", "Rubanda", "Rubirizi", "Rukiga", "Rukungiri"].sort());
                 initData(SUPERVISORS_KEY, () => [{ id: Date.now(), name: 'Default Supervisor', empId: 'SUP-001', email: 'sup.kagadi@rtv.org', phone: '0700123456', username: 'sup_kagadi', password: 'password123', district: 'Kagadi', status: 'active' }]);
                 initData(FIELDOFFICERS_KEY, () => [{ id: Date.now() + 1, name: 'Default Field Officer', empId: 'FO-001', email: 'fo.kyenjojo@rtv.org', phone: '0700654321', username: 'fo_kyenjojo', password: 'password123', district: 'Kyenjojo', status: 'active' }]);
                 initData(DATACOLLECTORS_KEY, () => [{ id: Date.now() + 2, name: 'Natuha Eve', empId: 'EM132', email: 'natuha@gmail.com', phone: '0700987654'}]);
                 initData(ADMIN_CREDS_KEY, () => ({ username: 'admin', password: 'admin123' }));
 
-                // Initial render of all UI components
                 populateDistrictDropdowns();
                 renderSupervisorsTable();
                 renderFieldOfficersTable();
-                renderDataCollectorsTable(); // New Render
+                renderDataCollectorsTable();
                 renderDistrictsTable();
                 setupEventListeners();
             }
@@ -694,9 +684,7 @@
                 const tableBody = document.getElementById('supervisorsTableBody');
                 const searchTerm = document.getElementById('supervisorSearchInput').value.toLowerCase();
                 
-                const filtered = supervisors.filter(item => 
-                    Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm))
-                );
+                const filtered = supervisors.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm)));
                 
                 tableBody.innerHTML = filtered.map(item => `
                     <tr data-id="${item.id}">
@@ -723,15 +711,13 @@
                 const tableBody = document.getElementById('fieldOfficersTableBody');
                 const searchTerm = document.getElementById('fieldOfficerSearchInput').value.toLowerCase();
 
-                 const filtered = officers.filter(item => 
-                    Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm))
-                );
+                 const filtered = officers.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm)));
 
                 tableBody.innerHTML = filtered.map(item => `
                     <tr data-id="${item.id}">
                         <td>
                             <div><strong>${item.name}</strong></div>
-                            <small style="color: var(--secondary);">ID: ${item.empId} | User: ${item.username}</small>
+                            <small style="color: var(--secondary);">ID: ${item.empId} | User: ${item.username || 'N/A'}</small>
                         </td>
                          <td>
                             <div>${item.email}</div>
@@ -740,22 +726,19 @@
                         <td><span class="badge district-badge">${item.district}</span></td>
                         <td><span class="badge ${item.status === 'active' ? 'badge-success' : 'badge-warning'}">${item.status}</span></td>
                         <td class="table-actions">
-                            <button class="btn btn-sm btn-outline edit-fieldofficer-btn">Edit</button>
-                            <button class="btn btn-sm btn-danger delete-fieldofficer-btn">Delete</button>
+                            <button class="btn btn-sm btn-outline edit-fieldOfficer-btn">Edit</button>
+                            <button class="btn btn-sm btn-danger delete-fieldOfficer-btn">Delete</button>
                         </td>
                     </tr>
                 `).join('') || `<tr><td colspan="5" style="text-align: center;">No field officers found.</td></tr>`;
             }
 
-            // START: NEW RENDER FUNCTION FOR DATA COLLECTORS
             function renderDataCollectorsTable() {
                 const collectors = getData(DATACOLLECTORS_KEY);
                 const tableBody = document.getElementById('dataCollectorsTableBody');
                 const searchTerm = document.getElementById('dataCollectorSearchInput').value.toLowerCase();
 
-                const filtered = collectors.filter(item => 
-                   Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm))
-                );
+                const filtered = collectors.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm)));
                 
                 tableBody.innerHTML = filtered.map(item => `
                     <tr data-id="${item.id}">
@@ -774,7 +757,6 @@
                     </tr>
                 `).join('') || `<tr><td colspan="3" style="text-align: center;">No data collectors found.</td></tr>`;
             }
-            // END: NEW RENDER FUNCTION
 
             function renderDistrictsTable() {
                 const districts = getData(DISTRICTS_KEY).sort();
@@ -795,7 +777,6 @@
                 }).join('') || `<tr><td colspan="3" style="text-align: center;">No districts found.</td></tr>`;
             }
             
-            // --- UI & EVENT LISTENERS ---
             function populateDistrictDropdowns() {
                 const districts = getData(DISTRICTS_KEY).sort();
                 const optionsHTML = '<option value="">Select District</option>' + districts.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -824,21 +805,22 @@
                 document.getElementById('fieldOfficersTableBody').addEventListener('click', (e) => handleTableAction(e, 'fieldOfficer'));
                 document.getElementById('fieldOfficerSearchInput').addEventListener('input', renderFieldOfficersTable);
 
-                // START: NEW DATA COLLECTOR LISTENERS
+                // Data Collectors
                 document.getElementById('addDataCollectorBtn').addEventListener('click', () => openDataCollectorModal());
                 document.getElementById('dataCollectorForm').addEventListener('submit', handleSaveDataCollector);
                 document.getElementById('dataCollectorsTableBody').addEventListener('click', handleDataCollectorTableAction);
                 document.getElementById('dataCollectorSearchInput').addEventListener('input', renderDataCollectorsTable);
                 document.getElementById('bulkUploadCollectorBtn').addEventListener('click', () => {
                     const modal = document.getElementById('bulkUploadCollectorModal');
-                    modal.querySelector('form')?.reset();
+                    // Reset modal state before showing
+                    const fileInput = modal.querySelector('#collector-file-upload');
+                    if(fileInput) fileInput.value = '';
                     modal.querySelector('#upload-preview').style.display = 'none';
                     modal.querySelector('#upload-preview').innerHTML = '';
                     modal.querySelector('#confirm-collector-upload').disabled = true;
                     modal.style.display = 'flex';
                 });
                 setupBulkUploadCollector();
-                // END: NEW DATA COLLECTOR LISTENERS
                 
                 // Admin & System
                 document.getElementById('adminPasswordForm').addEventListener('submit', handleAdminPasswordChange);
@@ -892,8 +874,7 @@
                 }
                 document.getElementById(modalId).style.display = 'flex';
             }
-
-            // START: NEW DATA COLLECTOR MODAL/FORM HANDLERS
+           
             function openDataCollectorModal(id = null) {
                 const modal = document.getElementById('dataCollectorModal');
                 const form = document.getElementById('dataCollectorForm');
@@ -967,7 +948,6 @@
                     openDeleteModal(collector.name, deleteCallback);
                 }
             }
-            // END: NEW DATA COLLECTOR HANDLERS
 
             function handleSaveUser(e, userType) {
                 e.preventDefault();
@@ -1017,12 +997,14 @@
                 if (!btn) return;
                 const id = btn.closest('tr').dataset.id;
                 
+                // Corrected class names to match the rendered HTML
                 if (btn.classList.contains(`edit-${userType}-btn`)) {
                     openUserModal(userType, id);
                 } else if (btn.classList.contains(`delete-${userType}-btn`)) {
                     const isSupervisor = userType === 'supervisor';
                     const dataKey = isSupervisor ? SUPERVISORS_KEY : FIELDOFFICERS_KEY;
                     const user = getData(dataKey).find(u => u.id == id);
+                    if (!user) return; // Safety check
                     const deleteCallback = () => {
                         saveData(dataKey, getData(dataKey).filter(item => item.id != id));
                         renderSupervisorsTable();
@@ -1099,8 +1081,7 @@
                 showAlert('adminAlert', 'success', 'Admin password updated successfully.');
                 e.target.reset();
             }
-
-            // START: NEW BULK UPLOAD COLLECTOR LOGIC
+            
             function setupBulkUploadCollector() {
                 const modal = document.getElementById('bulkUploadCollectorModal');
                 const fileInput = document.getElementById('collector-file-upload');
@@ -1157,7 +1138,7 @@
 
                     parsedData.forEach(row => {
                         const getVal = (keys) => {
-                            for (const key of keys) { if (row[key]) return row[key]; }
+                            for (const key of keys) { if (row[key]) return String(row[key]); }
                             return null;
                         };
                         const empId = getVal(['EM_No', 'em_no', 'empId', 'EM No']);
@@ -1170,13 +1151,13 @@
                             return;
                         }
 
-                        if (existingEmpIds.has(String(empId).toLowerCase())) {
+                        if (existingEmpIds.has(empId.toLowerCase())) {
                             skippedCount++;
                             return;
                         }
 
                         collectors.unshift({ id: Date.now() + addedCount, empId, name, phone: contact, email });
-                        existingEmpIds.add(String(empId).toLowerCase());
+                        existingEmpIds.add(empId.toLowerCase());
                         addedCount++;
                     });
                     
@@ -1186,7 +1167,6 @@
                     modal.style.display = 'none';
                 });
             }
-            // END: NEW BULK UPLOAD COLLECTOR LOGIC
             
             function togglePasswordVisibility(e) {
                 const button = e.currentTarget;

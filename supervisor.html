@@ -394,10 +394,8 @@
             color: var(--danger);
         }
         
-        .quick-action-btn span {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--dark);
+        .quick-action-btn.success i {
+            color: var(--success);
         }
         
         /* Transfer History */
@@ -531,6 +529,10 @@
                 <div class="quick-action-btn" id="quick-assign">
                     <i class="fas fa-user-plus"></i>
                     <span>Quick Assign</span>
+                </div>
+                <div class="quick-action-btn success" id="quick-receive">
+                    <i class="fas fa-hand-holding"></i>
+                    <span>Receive from Collector</span>
                 </div>
                 <div class="quick-action-btn" id="quick-return">
                     <i class="fas fa-undo"></i>
@@ -683,7 +685,7 @@
         const SUPERVISORS_KEY = 'supervisors';
         const INVENTORY_KEY = 'inventoryData';
         const MOVEMENT_LOGS_KEY = 'movementLogs';
-        const DATA_COLLECTORS_KEY = 'dataCollectors'; // <-- NEW KEY
+        const DATA_COLLECTORS_KEY = 'dataCollectors';
 
         document.addEventListener('DOMContentLoaded', () => {
             initializeSupervisorDashboard();
@@ -835,16 +837,20 @@
                 case 'pending-transfer':
                     return `<button class="btn btn-success btn-sm acknowledge-btn" data-item-id="${item.id}"><i class="fas fa-check-circle"></i> Acknowledge</button>`;
                 case 'available':
+                    // An available item can be assigned to a collector or returned to the field office.
                     return `<button class="btn btn-primary btn-sm assign-btn" data-item-id="${item.id}"><i class="fas fa-user-plus"></i> Assign</button>
                             <button class="btn btn-outline btn-sm return-btn" data-item-id="${item.id}"><i class="fas fa-undo"></i> Return to Field Office</button>`;
                 case 'in-use':
-                    return `<button class="btn btn-primary btn-sm transfer-btn" data-item-id="${item.id}"><i class="fas fa-exchange-alt"></i> Transfer</button>
-                            <button class="btn btn-warning btn-sm maintenance-btn" data-item-id="${item.id}"><i class="fas fa-tools"></i> Maintenance</button>
-                            <button class="btn btn-outline btn-sm return-btn" data-item-id="${item.id}"><i class="fas fa-undo"></i> Return to Field Office</button>`;
+                    // An item in use can be received back from the collector, transferred to another, or marked for maintenance.
+                    return `<button class="btn btn-success btn-sm receive-btn" data-item-id="${item.id}"><i class="fas fa-hand-holding"></i> Receive</button>
+                            <button class="btn btn-primary btn-sm transfer-btn" data-item-id="${item.id}"><i class="fas fa-exchange-alt"></i> Transfer</button>
+                            <button class="btn btn-warning btn-sm maintenance-btn" data-item-id="${item.id}"><i class="fas fa-tools"></i> Maintenance</button>`;
                 case 'maintenance':
                      return `<button class="btn btn-success btn-sm activate-btn" data-item-id="${item.id}"><i class="fas fa-check"></i> Mark as Available</button>`;
                 case 'reported-missing':
                     return 'Awaiting Admin Review';
+                case 'in-storage-field':
+                    return 'At Field Office';
                 default:
                     return 'No actions available';
             }
@@ -881,7 +887,6 @@
             });
         }
 
-        // NEW: Function to populate data collector dropdowns
         function populateCollectorDropdown(selectElementId) {
             const collectors = getDataCollectors();
             const dropdown = document.getElementById(selectElementId);
@@ -914,6 +919,7 @@
                 if (button.classList.contains('acknowledge-btn')) handleAcknowledge(itemId);
                 if (button.classList.contains('assign-btn')) openAssignModal(itemId, 'assign');
                 if (button.classList.contains('transfer-btn')) openAssignModal(itemId, 'transfer');
+                if (button.classList.contains('receive-btn')) handleReceiveFromCollector(itemId);
                 if (button.classList.contains('return-btn')) handleReturn(itemId);
                 if (button.classList.contains('maintenance-btn')) handleStatusChange(itemId, 'maintenance');
                 if (button.classList.contains('activate-btn')) handleStatusChange(itemId, 'available');
@@ -921,6 +927,7 @@
 
             // Quick action buttons
             document.getElementById('quick-assign').addEventListener('click', () => openBulkActionModal('assign'));
+            document.getElementById('quick-receive').addEventListener('click', () => openBulkActionModal('receive'));
             document.getElementById('quick-return').addEventListener('click', () => openBulkActionModal('return'));
             document.getElementById('quick-transfer').addEventListener('click', () => openBulkActionModal('transfer'));
             document.getElementById('quick-maintenance').addEventListener('click', () => openBulkActionModal('maintenance'));
@@ -944,6 +951,13 @@
         function handleAcknowledge(itemId) {
             if (confirm('Acknowledge receipt of this item? It will become available for assignment.')) {
                 handleStatusChange(itemId, 'available', 'Item acknowledged and made available.');
+            }
+        }
+        
+        function handleReceiveFromCollector(itemId) {
+            const item = getInventoryData().find(i => i.id === itemId);
+            if (confirm(`Receive "${item.name}" back from ${item.assigned}? The item will become available for re-assignment.`)) {
+                handleStatusChange(itemId, 'available', `Item received from data collector ${item.assigned}.`);
             }
         }
         
@@ -974,7 +988,6 @@
             }
         }
 
-        // UPDATED: Now populates a dropdown instead of using a text input
         function openAssignModal(itemId, type = 'assign') {
             const item = getInventoryData().find(i => i.id === itemId);
             const modal = document.getElementById('assign-modal');
@@ -983,7 +996,6 @@
                 document.getElementById('assign-item-name').textContent = `${item.name} (${item.id})`;
                 document.getElementById('assign-item-id').value = item.id;
                 
-                // Populate the dropdown with data collectors
                 populateCollectorDropdown('collector-select');
                 
                 modal.style.display = 'flex';
@@ -991,7 +1003,6 @@
             }
         }
         
-        // UPDATED: Reads value from the select dropdown
         function handleAssignSubmit(e) {
             e.preventDefault();
             const itemId = document.getElementById('assign-item-id').value;
@@ -1067,7 +1078,6 @@
             }
         }
         
-        // UPDATED: Replaces text input with a dropdown for bulk assignment/transfer
         function openBulkActionModal(actionType) {
             if (!currentSupervisor) { showNotification('Please select a supervisor first.'); return; }
             const modal = document.getElementById('bulk-action-modal');
@@ -1078,8 +1088,9 @@
             const itemPool = inventory.filter(item => item.district && item.district.toLowerCase() === currentSupervisor.district.toLowerCase());
             
             const actionConfig = {
+                receive: { title: 'Bulk Receive Items from Collectors', items: itemPool.filter(i => i.status === 'in-use') },
                 assign: { title: 'Bulk Assign Items', items: itemPool.filter(i => i.status === 'available') },
-                return: { title: 'Bulk Return to Field Office', items: itemPool.filter(i => ['available', 'in-use'].includes(i.status)) },
+                return: { title: 'Bulk Return to Field Office', items: itemPool.filter(i => i.status === 'available') },
                 transfer: { title: 'Bulk Transfer Items', items: itemPool.filter(i => i.status === 'in-use') },
                 maintenance: { title: 'Bulk Mark for Maintenance', items: itemPool.filter(i => ['available', 'in-use'].includes(i.status)) }
             };
@@ -1099,8 +1110,8 @@
                                     </select>
                                 </div>`;
             }
-            contentHTML += `<p>Select items below:</p><div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 0.5rem;">
-                ${config.items.map(item => `<div><input type="checkbox" id="bulk-item-${item.id}" value="${item.id}" style="margin-right:0.5rem;"><label for="bulk-item-${item.id}">${item.name} (${item.id})</label></div>`).join('')}
+             contentHTML += `<p>Select items below:</p><div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 0.5rem;">
+                ${config.items.map(item => `<div><input type="checkbox" id="bulk-item-${item.id}" value="${item.id}" style="margin-right:0.5rem;"><label for="bulk-item-${item.id}">${item.name} (${item.id})${item.assigned ? ' - Assigned to: ' + item.assigned : ''}</label></div>`).join('')}
             </div>`;
             
             modalTitle.textContent = config.title;
@@ -1109,7 +1120,6 @@
             modal.dataset.actionType = actionType;
         }
         
-        // UPDATED: Reads value from the new bulk select dropdown
         function handleBulkActionConfirm() {
             const modal = document.getElementById('bulk-action-modal');
             const actionType = modal.dataset.actionType;
@@ -1131,14 +1141,34 @@
                 const itemIndex = inventory.findIndex(i => i.id === itemId);
                 if (itemIndex > -1) {
                     const item = inventory[itemIndex];
+                    const originalAssignee = item.assigned;
                     switch(actionType) {
-                        case 'assign': item.status = 'in-use'; item.assigned = collectorName; break;
-                        case 'return': item.status = 'in-storage-field'; item.assigned = ''; break;
-                        case 'transfer': item.assigned = collectorName; break;
-                        case 'maintenance': item.status = 'maintenance'; item.assigned = ''; break;
+                        case 'receive':
+                            item.status = 'available';
+                            item.assigned = '';
+                            logMovement(itemId, `bulk_receive`, `Item received from ${originalAssignee}`);
+                            break;
+                        case 'assign': 
+                            item.status = 'in-use'; 
+                            item.assigned = collectorName; 
+                            logMovement(itemId, `bulk_assign`, `Item assigned to ${collectorName}`);
+                            break;
+                        case 'return': 
+                            item.status = 'in-storage-field'; 
+                            item.assigned = ''; 
+                            logMovement(itemId, `bulk_return`, `Item returned to field office storage`);
+                            break;
+                        case 'transfer': 
+                            item.assigned = collectorName;
+                             logMovement(itemId, `bulk_transfer`, `Item transferred from ${originalAssignee} to ${collectorName}`);
+                            break;
+                        case 'maintenance': 
+                            item.status = 'maintenance'; 
+                            item.assigned = ''; 
+                            logMovement(itemId, `bulk_maintenance`, `Item marked for maintenance`);
+                            break;
                     }
                     item.lastUpdate = new Date().toLocaleDateString();
-                    logMovement(itemId, `bulk_${actionType}`, `Bulk action processed.`);
                     successCount++;
                 }
             });

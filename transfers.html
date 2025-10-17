@@ -216,6 +216,22 @@
                                 <option value="">-- Select a District --</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="activity-select">Activity</label>
+                            <select id="activity-select" class="form-control" required>
+                                <option value="">-- Select an Activity --</option>
+                                <option value="BHS">BHS</option>
+                                <option value="AHS">AHS</option>
+                                <option value="SEs">SEs</option>
+                                <option value="Mapping">Mapping</option>
+                                <option value="CNP">CNP</option>
+                                <option value="Other Venn Surveys">Other Venn Surveys</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="other-activity-group" style="display: none;">
+                            <label for="other-activity-text">Specify Other Survey *</label>
+                            <input type="text" id="other-activity-text" class="form-control" placeholder="Enter survey name">
+                        </div>
                         <button class="btn btn-primary" id="initiate-transfer-btn" disabled>
                             <i class="fas fa-paper-plane"></i> Initiate Transfer
                         </button>
@@ -259,6 +275,9 @@
             const selectedList = document.getElementById('selected-items-list');
             const selectedCountSpan = document.getElementById('selected-count');
             const districtSelect = document.getElementById('district-select');
+            const activitySelect = document.getElementById('activity-select');
+            const otherActivityGroup = document.getElementById('other-activity-group'); // NEW
+            const otherActivityText = document.getElementById('other-activity-text'); // NEW
             const transferBtn = document.getElementById('initiate-transfer-btn');
 
             // --- Data Initialization ---
@@ -392,7 +411,19 @@
                 }
                 
                 selectedCountSpan.textContent = itemsToTransfer.size;
-                transferBtn.disabled = !(itemsToTransfer.size > 0 && districtSelect.value !== "");
+                
+                // --- MODIFIED LOGIC ---
+                const isOtherSurvey = activitySelect.value === 'Other Venn Surveys';
+                otherActivityGroup.style.display = isOtherSurvey ? 'block' : 'none';
+                
+                let isFormValid = itemsToTransfer.size > 0 && districtSelect.value !== "" && activitySelect.value !== "";
+                
+                if (isOtherSurvey) {
+                    // If 'Other' is selected, the text box must also be filled
+                    isFormValid = isFormValid && otherActivityText.value.trim() !== "";
+                }
+                
+                transferBtn.disabled = !isFormValid;
             }
 
             // --- Event Handlers ---
@@ -422,10 +453,24 @@
             
             function handleInitiateTransfer() {
                 const destinationDistrict = districtSelect.value;
-                if (itemsToTransfer.size === 0 || !destinationDistrict) return;
+                let activity = activitySelect.value; // Get selected activity
+
+                // --- MODIFICATION: Check for 'Other' activity ---
+                if (activity === 'Other Venn Surveys') {
+                    const otherActivity = otherActivityText.value.trim();
+                    if (otherActivity === "") {
+                        showNotification("Please specify the 'Other Venn Survey' name.");
+                        return;
+                    }
+                    activity = otherActivity; // Use the user-specified text
+                }
+
+                if (itemsToTransfer.size === 0 || !destinationDistrict || !activity) return;
                 
                 const itemNames = Array.from(itemsToTransfer.values()).map(i => ` - ${i.name} (${i.id})`).join('\n');
-                if (confirm(`Are you sure you want to transfer ${itemsToTransfer.size} item(s) to the ${destinationDistrict} district?\n\nItems:\n${itemNames}`)) {
+                const confirmMessage = `Are you sure you want to transfer ${itemsToTransfer.size} item(s) to the ${destinationDistrict} district for the ${activity} activity?\n\nItems:\n${itemNames}`;
+
+                if (confirm(confirmMessage)) {
                     let inventory = getInventoryData();
                     let logs = getMovementLogs();
                     const today = new Date().toLocaleDateString();
@@ -437,11 +482,14 @@
                             inventory[itemIndex].district = destinationDistrict;
                             inventory[itemIndex].assigned = ''; 
                             inventory[itemIndex].lastUpdate = today;
+                            inventory[itemIndex].activity = activity; // Store the (potentially custom) activity
+                            
+                            const logDetails = `Transferred from Mbarara store to ${destinationDistrict} for ${activity}. Awaiting supervisor acknowledgement.`;
                             
                             logs.unshift({
                                 itemId: id,
                                 action: 'transfer_initiated',
-                                details: `Transferred from Mbarara store to ${destinationDistrict}. Awaiting supervisor acknowledgement.`,
+                                details: logDetails,
                                 timestamp: new Date().toISOString()
                             });
                         }
@@ -454,6 +502,8 @@
 
                     itemsToTransfer.clear();
                     districtSelect.value = '';
+                    activitySelect.value = ''; // Reset activity dropdown
+                    otherActivityText.value = ''; // Reset 'other' text field
                     loadPage();
                 }
             }
@@ -463,6 +513,8 @@
                 selectedList.addEventListener('click', handleRemoveItem);
                 searchInput.addEventListener('input', renderAvailableItems);
                 districtSelect.addEventListener('change', updateTransferUI);
+                activitySelect.addEventListener('change', updateTransferUI);
+                otherActivityText.addEventListener('input', updateTransferUI); // NEW: Add listener for the text input
                 transferBtn.addEventListener('click', handleInitiateTransfer);
                 document.getElementById('logout-btn').addEventListener('click', () => {
                     sessionStorage.removeItem('loggedInUser');

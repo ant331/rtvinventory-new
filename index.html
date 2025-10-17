@@ -234,6 +234,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         .card-header h2 { font-size: 1.1rem; font-weight: 600; color: var(--dark); }
@@ -263,6 +265,13 @@
         .btn-outline:hover { background: var(--light); color: var(--dark); }
         .btn-success { background: var(--success); color: white; }
         .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+        
+        .form-control {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
 
         /* District Inventory Styles */
         .district-grid {
@@ -356,7 +365,7 @@
             margin-left: 10px;
         }
 
-        /* --- NEW: Download Button --- */
+        /* --- Download Button --- */
         .card-download-btn {
             position: absolute;
             top: 10px;
@@ -380,8 +389,9 @@
         }
         .card-header .card-download-btn {
             position: static; /* Override absolute for headers */
-            margin-left: 1rem;
         }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -520,7 +530,10 @@
             <div class="card" id="approval-card" style="display: none; margin-bottom: 1.5rem;">
                 <div class="card-header">
                     <h2>Items Awaiting Approval</h2>
-                    <button class="card-download-btn" title="Download Pending List" data-download-type="pending"><i class="fas fa-download"></i></button>
+                     <div style="display: flex; align-items: center; gap: 1rem;">
+                        <input type="text" id="approvalSearchInput" class="form-control" placeholder="Search approvals..." style="width: 250px;">
+                        <button class="card-download-btn" title="Download Pending List" data-download-type="pending"><i class="fas fa-download"></i></button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="approval-list-container">
@@ -539,6 +552,30 @@
                 <div class="card-body">
                     <div class="district-grid" id="districtGrid">
                         <p>Loading district data...</p>
+                    </div>
+                </div>
+            </div>
+            
+             <div class="card" style="margin-top: 1.5rem;">
+                <div class="card-header">
+                    <h2>Incident Reports (<span id="incidentCount">0</span>)</h2>
+                    <button class="btn btn-outline card-download-btn" data-download-type="incidents" title="Download All Incident Reports">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p>Review and resolve items reported as lost, stolen, or damaged. Go to the <a href="Inventory.html">Inventory Page</a> to resolve them.</p>
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                         <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Item ID & Name</th>
+                                    <th>Details</th>
+                                    <th>Reported On</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incidentListBody"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -587,6 +624,7 @@
             const notificationDropdown = document.getElementById('notificationDropdown');
             const notificationList = document.getElementById('notificationList');
             const clearNotificationsBtn = document.getElementById('clearNotificationsBtn');
+            const approvalSearchInput = document.getElementById('approvalSearchInput');
 
             function initializeData() {
                 if (!localStorage.getItem(INVENTORY_KEY)) {
@@ -745,42 +783,87 @@
                 return logs.slice(0, 10).map(log => ({ ...log, item: inventoryMap.get(log.itemId) || { name: `Item ${log.itemId}` } }));
             }
 
-            function renderApprovalQueue(inventory, logs) {
+            function renderApprovalQueue(inventory, logs, searchTerm = '') {
                 const approvalCard = document.getElementById('approval-card');
                 const approvalContainer = document.getElementById('approval-list-container');
                 const returnLogs = new Map();
 
                 logs.forEach(log => {
-                    if (log.action === 'return_to_store' && !returnLogs.has(log.itemId)) {
-                        const match = log.details.match(/from (.*?) field office/);
-                        if (match && match[1]) {
-                            returnLogs.set(log.itemId, match[1]);
+                    if ((log.action === 'return_to_store' || log.action === 'acknowledge_return') && !returnLogs.has(log.itemId)) {
+                        const match = log.details.match(/from (.*?) field office|from Supervisor (.*?)(?: at|$)/);
+                        if (match) {
+                            returnLogs.set(log.itemId, match[1] || match[2]);
                         }
                     }
                 });
 
-                const pendingItems = inventory.filter(item => item.status === 'pending-approval');
+                let pendingItems = inventory.filter(item => item.status === 'pending-approval');
 
-                if (pendingItems.length > 0) {
+                if (searchTerm) {
+                    pendingItems = pendingItems.filter(item => 
+                        item.id.toLowerCase().includes(searchTerm) || 
+                        item.name.toLowerCase().includes(searchTerm)
+                    );
+                }
+
+                if (pendingItems.length > 0 || searchTerm) {
                     approvalCard.style.display = 'block';
-                    const itemsHTML = pendingItems.map(item => {
-                        const originDistrict = returnLogs.get(item.id) || 'Unknown';
-                        return `
-                        <div class="approval-item">
-                            <div class="approval-item-info">
-                                <span class="item-id">${item.name} (${item.id})</span>
-                                <span class="item-origin">Returned from: <strong>${originDistrict}</strong></span>
-                            </div>
-                            <button class="btn btn-success btn-sm approve-btn" data-item-id="${item.id}">
-                                <i class="fas fa-check"></i> Approve
-                            </button>
-                        </div>`;
-                    }).join('');
-                    approvalContainer.innerHTML = `<div class="approval-list">${itemsHTML}</div>`;
+                    if (pendingItems.length > 0) {
+                         const itemsHTML = pendingItems.map(item => {
+                            const originDistrict = returnLogs.get(item.id) || 'Unknown';
+                            return `
+                            <div class="approval-item">
+                                <div class="approval-item-info">
+                                    <span class="item-id">${item.name} (${item.id})</span>
+                                    <span class="item-origin">Returned from: <strong>${originDistrict}</strong></span>
+                                </div>
+                                <button class="btn btn-success btn-sm approve-btn" data-item-id="${item.id}">
+                                    <i class="fas fa-check"></i> Approve
+                                </button>
+                            </div>`;
+                        }).join('');
+                        approvalContainer.innerHTML = `<div class="approval-list">${itemsHTML}</div>`;
+                    } else {
+                        approvalContainer.innerHTML = `<p style="text-align: center; color: var(--secondary);">No matching items found.</p>`;
+                    }
                 } else {
                     approvalCard.style.display = 'none';
                     approvalContainer.innerHTML = '';
                 }
+            }
+
+            function renderIncidentReports(inventory, logs) {
+                const incidentCountSpan = document.getElementById('incidentCount');
+                const incidentListBody = document.getElementById('incidentListBody');
+                
+                const unresolvedIncidents = inventory.filter(item => item.status === 'reported-missing');
+                const incidentLogs = logs.filter(log => log.action === 'incident_report');
+                const incidentMap = new Map();
+
+                incidentLogs.forEach(log => {
+                    if (!incidentMap.has(log.itemId)) {
+                        incidentMap.set(log.itemId, log);
+                    }
+                });
+                
+                incidentCountSpan.textContent = unresolvedIncidents.length;
+                incidentListBody.innerHTML = '';
+
+                if (unresolvedIncidents.length === 0) {
+                    incidentListBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--secondary);">No unresolved incidents.</td></tr>';
+                    return;
+                }
+
+                unresolvedIncidents.forEach(item => {
+                    const log = incidentMap.get(item.id);
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${item.id}</strong><br>${item.name}</td>
+                        <td>${log ? log.details : 'Details not found.'}</td>
+                        <td>${log ? new Date(log.timestamp).toLocaleDateString() : 'N/A'}</td>
+                    `;
+                    incidentListBody.appendChild(row);
+                });
             }
 
             function updateAllUI() {
@@ -807,7 +890,9 @@
                     document.getElementById(`${elementIdPrefix}InUse`).textContent = typeStats[type].inUse;
                 });
 
-                renderApprovalQueue(inventory, logs);
+                const searchTerm = approvalSearchInput.value.toLowerCase();
+                renderApprovalQueue(inventory, logs, searchTerm);
+                renderIncidentReports(inventory, logs);
                 
                 const allDistrictsSorted = calculateAllDistrictInventories(inventory, supervisors, districts);
                 const districtGrid = document.getElementById('districtGrid');
@@ -885,7 +970,6 @@
                 }
             }
 
-            // --- NEW: CSV Download Helper ---
             function downloadCSV(data, filename = 'export.csv') {
                 if (!data || data.length === 0) {
                     alert('No data available to download.');
@@ -928,7 +1012,8 @@
                 });
                 
                 clearNotificationsBtn.addEventListener('click', () => {
-                    if (getNotifications().length > 0 && confirm('Are you sure you want to clear all notifications?')) {
+                    const notifications = getNotifications();
+                    if (notifications.length > 0 && confirm('Are you sure you want to clear all notifications? This will mark all as read and remove them.')) {
                         saveNotifications([]);
                         updateNotificationsUI();
                     }
@@ -946,7 +1031,7 @@
                     const notificationItem = e.target.closest('.notification-item');
                     if (!notificationItem) return;
 
-                    // Mark notification as read
+                    // Mark notification as read if it is unread
                     const notificationId = notificationItem.dataset.id;
                     if (notificationId && notificationItem.classList.contains('unread')) {
                         let notifications = getNotifications();
@@ -954,8 +1039,7 @@
                         if (notifIndex > -1) {
                             notifications[notifIndex].read = true;
                             saveNotifications(notifications);
-                            // Re-render the notifications UI to update count and styles immediately
-                            updateNotificationsUI(); 
+                            updateNotificationsUI(); // Instantly update the count and remove blue background
                         }
                     }
 
@@ -965,7 +1049,10 @@
 
                     if (!type || !itemId) return; 
 
-                    notificationDropdown.style.display = 'none';
+                    // Close dropdown after a short delay to see the visual change
+                    setTimeout(() => {
+                        notificationDropdown.style.display = 'none';
+                    }, 200);
 
                     if (type === 'approval') {
                         const approvalCard = document.getElementById('approval-card');
@@ -997,7 +1084,8 @@
                     }
                 });
 
-                // --- NEW: Download Event Listener ---
+                approvalSearchInput.addEventListener('input', updateAllUI);
+
                 document.querySelector('.main-content').addEventListener('click', (e) => {
                     const downloadBtn = e.target.closest('.card-download-btn');
                     if (!downloadBtn) return;
@@ -1019,6 +1107,15 @@
                         case 'pending':
                             const pendingData = inventory.filter(item => item.status === 'pending-approval');
                             downloadCSV(pendingData, 'pending_approval_items.csv');
+                            break;
+                        case 'incidents':
+                            const incidentLogs = getMovementLogs().filter(log => log.action === 'incident_report');
+                             const incidentData = incidentLogs.map(log => ({
+                                timestamp: log.timestamp,
+                                itemId: log.itemId,
+                                details: log.details
+                            }));
+                            downloadCSV(incidentData, 'incident_reports.csv');
                             break;
                         case 'all_districts_summary':
                             const supervisors = getSupervisorData();

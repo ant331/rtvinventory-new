@@ -422,6 +422,7 @@
                                         <th><input type="checkbox" id="selectAllDataCollectors"></th>
                                         <th>Collector Info</th>
                                         <th>Contact Info</th>
+                                        <th>District</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -662,6 +663,10 @@
                             <label for="dataCollectorEmail">Email</label>
                             <input type="email" class="form-control" id="dataCollectorEmail">
                         </div>
+                        <div class="form-group full-width">
+                            <label for="dataCollectorDistrict">District *</label>
+                            <select class="form-control" id="dataCollectorDistrict" required></select>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -678,7 +683,7 @@
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Upload a CSV or XLSX file. Required columns: <strong>EM_No, Name, Contact</strong>. Optional: <strong>Email</strong>.</p>
+                <p>Upload a CSV or XLSX file. Required columns: <strong>EM_No, Name, Contact, District</strong>. Optional: <strong>Email</strong>.</p>
                 <div class="form-group">
                     <label for="collector-file-upload">Choose File</label>
                     <input type="file" class="form-control" id="collector-file-upload" accept=".csv, .xlsx, .xls">
@@ -686,7 +691,7 @@
                 <div id="upload-preview" style="display: none;"></div>
             </div>
             <div class="modal-footer">
-                <a href="data:text/csv;charset=utf-8,EM_No,Name,Contact,Email%0ADC-DEMO-1,Jane Doe,0700123456,jane.doe@example.com" download="datacollector_template.csv" class="btn btn-outline">
+                <a href="data:text/csv;charset=utf-8,EM_No,Name,Contact,District,Email%0ADC-DEMO-1,Jane Doe,0700123456,Kagadi,jane.doe@example.com" download="datacollector_template.csv" class="btn btn-outline">
                     <i class="fas fa-download"></i> Download Template
                 </a>
                 <button type="button" class="btn btn-success" id="confirm-collector-upload" disabled>
@@ -771,7 +776,7 @@
                 initData(DISTRICTS_KEY, () => ["Amuru", "Gulu", "Isingiro", "Kabale", "Kagadi", "Kaliro", "Kamwengye", "Kanungu", "Kibaale", "Kiryandongo", "Kisoro", "Kyegegwa", "Kyenjojo", "Luuka", "Mbarara", "Mitooma", "Nwoya", "Rubanda", "Rubirizi", "Rukiga", "Rukungiri"].sort());
                 initData(SUPERVISORS_KEY, () => [{ id: Date.now(), name: 'Default Supervisor', empId: 'SUP-001', email: 'sup.kagadi@rtv.org', phone: '0700123456', username: 'sup_kagadi', password: 'password123', district: 'Kagadi', status: 'active' }]);
                 initData(FIELDOFFICERS_KEY, () => [{ id: Date.now() + 1, name: 'Default Field Officer', empId: 'FO-001', email: 'fo.kyenjojo@rtv.org', phone: '0700654321', username: 'fo_kyenjojo', password: 'password123', district: 'Kyenjojo', status: 'active' }]);
-                initData(DATACOLLECTORS_KEY, () => [{ id: Date.now() + 2, name: 'Natuha Eve', empId: 'EM132', email: 'natuha@gmail.com', phone: '0700987654'}]);
+                initData(DATACOLLECTORS_KEY, () => [{ id: Date.now() + 2, name: 'Natuha Eve', empId: 'EM132', email: 'natuha@gmail.com', phone: '0700987654', district: 'Kagadi'}]);
                 
                 // --- ADMIN ACCOUNTS INITIALIZATION (Updated) ---
                 const adminCreds = localStorage.getItem(ADMIN_ACCOUNTS_KEY);
@@ -882,12 +887,13 @@
                             <div>${item.email || 'N/A'}</div>
                             <small style="color: var(--secondary);">${item.phone || 'N/A'}</small>
                         </td>
+                        <td><span class="badge district-badge">${item.district || 'N/A'}</span></td>
                         <td class="table-actions">
                             <button class="btn btn-sm btn-outline edit-datacollector-btn">Edit</button>
                             <button class="btn btn-sm btn-danger delete-datacollector-btn">Delete</button>
                         </td>
                     </tr>
-                `}).join('') || `<tr><td colspan="4" style="text-align: center;">No data collectors found.</td></tr>`;
+                `}).join('') || `<tr><td colspan="5" style="text-align: center;">No data collectors found.</td></tr>`;
                 updateBulkActionUI('dataCollector');
             }
 
@@ -932,6 +938,7 @@
                 const optionsHTML = '<option value="">Select District</option>' + districts.map(d => `<option value="${d}">${d}</option>`).join('');
                 document.getElementById('supervisorDistrict').innerHTML = optionsHTML;
                 document.getElementById('fieldOfficerDistrict').innerHTML = optionsHTML;
+                document.getElementById('dataCollectorDistrict').innerHTML = optionsHTML; // Added
             }
 
             function setupEventListeners() {
@@ -1053,6 +1060,7 @@
                     document.getElementById('dataCollectorEmpId').value = collector.empId;
                     document.getElementById('dataCollectorPhone').value = collector.phone;
                     document.getElementById('dataCollectorEmail').value = collector.email;
+                    document.getElementById('dataCollectorDistrict').value = collector.district; // Added
                 } else {
                     modalTitle.textContent = 'Add Data Collector';
                     document.getElementById('dataCollectorId').value = '';
@@ -1067,9 +1075,10 @@
                 const empId = document.getElementById('dataCollectorEmpId').value.trim();
                 const phone = document.getElementById('dataCollectorPhone').value.trim();
                 const email = document.getElementById('dataCollectorEmail').value.trim().toLowerCase();
+                const district = document.getElementById('dataCollectorDistrict').value; // Added
                 
-                if (!name || !empId || !phone) {
-                    return showAlert('dataCollectorAlert', 'error', 'Please fill all required fields.');
+                if (!name || !empId || !phone || !district) { // Added district validation
+                    return showAlert('dataCollectorAlert', 'error', 'Please fill all required fields (Name, EM_No, Phone, District).');
                 }
 
                 let collectors = getData(DATACOLLECTORS_KEY);
@@ -1077,7 +1086,7 @@
                     return showAlert('dataCollectorAlert', 'error', `EM_No '${empId}' is already in use.`);
                 }
                 
-                const collectorObject = { name, empId, phone, email };
+                const collectorObject = { name, empId, phone, email, district }; // Added district
 
                 if (id) { // Editing
                     const index = collectors.findIndex(c => c.id == id);
@@ -1462,8 +1471,9 @@
                         const name = getVal(['Name', 'name']);
                         const contact = getVal(['Contact', 'contact', 'Phone']);
                         const email = getVal(['Email', 'email']);
+                        const district = getVal(['District', 'district']); // Added
 
-                        if (!empId || !name || !contact) {
+                        if (!empId || !name || !contact || !district) { // Added district
                             skippedCount++;
                             return;
                         }
@@ -1473,13 +1483,13 @@
                             return;
                         }
 
-                        collectors.unshift({ id: Date.now() + addedCount, empId, name, phone: contact, email });
+                        collectors.unshift({ id: Date.now() + addedCount, empId, name, phone: contact, email, district }); // Added district
                         existingEmpIds.add(empId.toLowerCase());
                         addedCount++;
                     });
                     
                     saveData(DATACOLLECTORS_KEY, collectors);
-                    showAlert('dataCollectorAlert', 'success', `Added ${addedCount} collectors. Skipped ${skippedCount} (missing data or duplicate EM_No).`);
+                    showAlert('dataCollectorAlert', 'success', `Added ${addedCount} collectors. Skipped ${skippedCount} (missing data, duplicate EM_No, or missing district).`);
                     renderDataCollectorsTable();
                     modal.style.display = 'none';
                 });

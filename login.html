@@ -192,7 +192,24 @@
                 init('districts', ["Kagadi", "Kibaale", "Kyenjojo", "Kyegegwa", "Mbarara"]);
                 init('supervisors', [{ id: 1, name: 'Default Supervisor', username: 'kagadi', district: 'Kagadi', status: 'active', password: '12345678' }]);
                 init('fieldOfficers', [{ id: 2, name: 'Default Field Officer', username: 'kyenjojo', district: 'Kyenjojo', status: 'active', password: 'rtvfield' }]);
-                init('adminCredentials', { username: 'admin', password: 'admin123' });
+                
+                // --- ADMIN ACCOUNTS INITIALIZATION (Updated) ---
+                const adminCredsKey = 'adminCredentials';
+                const adminCreds = localStorage.getItem(adminCredsKey);
+                if (!adminCreds) {
+                    init(adminCredsKey, [{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]);
+                } else {
+                    try {
+                        const parsed = JSON.parse(adminCreds);
+                        if (!Array.isArray(parsed)) {
+                            // Convert old object format to new array format
+                            init(adminCredsKey, [{ id: 1, username: parsed.username || 'admin', password: parsed.password || 'admin123', isPrimary: true }]);
+                        }
+                    } catch (e) {
+                         init(adminCredsKey, [{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]);
+                    }
+                }
+                
                 init('adminNotifications', []); // Ensure notifications array exists
             }
             initializeDefaultData();
@@ -213,10 +230,12 @@
                 const password = passwordInput.value;
 
                 // --- AUTHENTICATION LOGIC ---
-                // 1. Check for Admin
-                const adminCreds = JSON.parse(localStorage.getItem('adminCredentials')) || { username: 'admin', password: 'admin123' };
-                if (username === adminCreds.username && password === adminCreds.password) {
-                    loginSuccess({ username: 'Admin', role: 'admin' }, 'index.html');
+                
+                // 1. Check for Admin (Updated)
+                const adminAccounts = JSON.parse(localStorage.getItem('adminCredentials')) || [];
+                const adminUser = adminAccounts.find(a => a.username === username && a.password === password);
+                if (adminUser) {
+                    loginSuccess({ username: adminUser.username, role: 'admin' }, 'index.html');
                     return;
                 }
 

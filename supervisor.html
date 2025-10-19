@@ -528,7 +528,7 @@
             <div class="quick-actions">
                 <div class="quick-action-btn" id="quick-assign">
                     <i class="fas fa-user-plus"></i>
-                    <span>Quick Assign</span>
+                    <span>Assign to Collector</span>
                 </div>
                 <div class="quick-action-btn success" id="quick-receive">
                     <i class="fas fa-hand-holding"></i>
@@ -540,7 +540,11 @@
                 </div>
                 <div class="quick-action-btn" id="quick-transfer">
                     <i class="fas fa-exchange-alt"></i>
-                    <span>Transfer Items</span>
+                    <span>Transfer to Collector</span>
+                </div>
+                <div class="quick-action-btn" id="quick-district-transfer">
+                    <i class="fas fa-shipping-fast"></i>
+                    <span>Transfer to Supervisor</span>
                 </div>
                 <div class="quick-action-btn" id="quick-maintenance">
                     <i class="fas fa-tools"></i>
@@ -614,6 +618,10 @@
             <form id="assign-form">
                 <input type="hidden" id="assign-item-id">
                 <div class="form-group">
+                    <label for="collector-search">Search Collector (by Name or EM_No)</label>
+                    <input type="text" class="form-control" id="collector-search" placeholder="Search collectors in your district...">
+                </div>
+                <div class="form-group">
                     <label for="collector-select">Data Collector Name</label>
                     <select class="form-control" id="collector-select" required>
                         <option value="">-- Select a Collector --</option>
@@ -642,7 +650,7 @@
                         <option value="">-- Select Type --</option>
                         <option value="Lost">Lost</option>
                         <option value="Stolen">Stolen</option>
-                        <option value="Damaged ">Damaged </option>
+                        <option value="Damaged Beyond Repair">Damaged Beyond Repair</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -651,7 +659,7 @@
                 </div>
                 <div class="form-group">
                     <label for="incident-details">Incident Details *</label>
-                    <textarea id="incident-details" class="form-control" rows="4" required placeholder="Provide a detailed description of what happened."></textarea>
+                    <textarea id="incident-details" class="form-control" rows="4" required placeholder="Provide a detailed description of what happened, Include a police reference number."></textarea>
                 </div>
                 <div class="form-group">
                     <label for="incident-document">Attach Police Reference (PDF, JPG, PNG)</label>
@@ -892,12 +900,41 @@
             });
         }
 
-        function populateCollectorDropdown(selectElementId) {
-            const collectors = getDataCollectors();
+        /**
+         * Populates a select dropdown with data collectors from the current supervisor's district.
+         * Can be filtered by a search term.
+         * @param {string} selectElementId - The ID of the <select> element to populate.
+         * @param {string} [searchTerm=''] - An optional search term to filter collectors.
+         */
+        function populateCollectorDropdown(selectElementId, searchTerm = '') {
+            if (!currentSupervisor) return; // Safety check
+            
+            const allCollectors = getDataCollectors();
             const dropdown = document.getElementById(selectElementId);
+            const normalizedSearch = searchTerm.toLowerCase();
+
+            // Feature 2: Filter by current supervisor's district
+            let districtCollectors = allCollectors.filter(c => 
+                c.district && c.district.toLowerCase() === currentSupervisor.district.toLowerCase()
+            );
+
+            // Feature 3: Filter by search term
+            let filteredCollectors = districtCollectors;
+            if (normalizedSearch) {
+                filteredCollectors = districtCollectors.filter(c => 
+                    c.name.toLowerCase().includes(normalizedSearch) || 
+                    c.empId.toLowerCase().includes(normalizedSearch)
+                );
+            }
+            
             dropdown.innerHTML = '<option value="">-- Select a Collector --</option>';
-            collectors.sort((a, b) => a.name.localeCompare(b.name));
-            collectors.forEach(collector => {
+            filteredCollectors.sort((a, b) => a.name.localeCompare(b.name));
+            
+            if (filteredCollectors.length === 0 && districtCollectors.length > 0) {
+                 dropdown.innerHTML = '<option value="">No collectors match search</option>';
+            }
+            
+            filteredCollectors.forEach(collector => {
                 const option = document.createElement('option');
                 option.value = collector.name;
                 option.textContent = `${collector.name} (${collector.empId})`;
@@ -935,6 +972,7 @@
             document.getElementById('quick-receive').addEventListener('click', () => openBulkActionModal('receive'));
             document.getElementById('quick-return').addEventListener('click', () => openBulkActionModal('return'));
             document.getElementById('quick-transfer').addEventListener('click', () => openBulkActionModal('transfer'));
+            document.getElementById('quick-district-transfer').addEventListener('click', () => openBulkActionModal('district-transfer')); // NEW
             document.getElementById('quick-maintenance').addEventListener('click', () => openBulkActionModal('maintenance'));
             document.getElementById('quick-incident').addEventListener('click', openIncidentModal);
 
@@ -944,6 +982,17 @@
             });
             window.addEventListener('click', e => {
                 if(e.target.classList.contains('modal')) e.target.style.display = 'none';
+            });
+
+            // Collector search input listeners
+            document.getElementById('collector-search').addEventListener('input', e => {
+                populateCollectorDropdown('collector-select', e.target.value);
+            });
+            
+            document.getElementById('bulk-action-modal').addEventListener('input', e => {
+                if (e.target.id === 'bulk-collector-search') {
+                    populateCollectorDropdown('bulk-collector-select', e.target.value);
+                }
             });
 
             document.getElementById('assign-form').addEventListener('submit', handleAssignSubmit);
@@ -1011,10 +1060,11 @@
                 document.getElementById('assign-item-name').textContent = `${item.name} (${item.id})`;
                 document.getElementById('assign-item-id').value = item.id;
                 
-                populateCollectorDropdown('collector-select');
+                document.getElementById('collector-search').value = ''; // Reset search
+                populateCollectorDropdown('collector-select'); // Initial population
                 
                 modal.style.display = 'flex';
-                document.getElementById('collector-select').focus();
+                document.getElementById('collector-search').focus();
             }
         }
         
@@ -1128,25 +1178,50 @@
                 receive: { title: 'Bulk Receive Items from Collectors', items: itemPool.filter(i => i.status === 'in-use') },
                 assign: { title: 'Bulk Assign Items', items: itemPool.filter(i => i.status === 'available') },
                 return: { title: 'Bulk Return to Field Office', items: itemPool.filter(i => i.status === 'available') },
-                transfer: { title: 'Bulk Transfer Items', items: itemPool.filter(i => i.status === 'in-use') },
+                transfer: { title: 'Bulk Transfer Items to Collector', items: itemPool.filter(i => i.status === 'in-use') },
+                'district-transfer': { title: 'Bulk Transfer to Another District', items: itemPool.filter(i => i.status === 'available') }, // NEW
                 maintenance: { title: 'Bulk Mark for Maintenance', items: itemPool.filter(i => ['available', 'in-use'].includes(i.status)) }
             };
             
             const config = actionConfig[actionType];
+            if (!config) {
+                console.error(`Unknown bulk action type: ${actionType}`);
+                return;
+            }
+
             if (config.items.length === 0) { showNotification(`No items available for this bulk action.`); return; }
             
             let contentHTML = '';
+            // Collector Dropdown for assign/transfer
             if (actionType === 'assign' || actionType === 'transfer') {
-                const collectors = getDataCollectors().sort((a,b) => a.name.localeCompare(b.name));
-                const options = collectors.map(c => `<option value="${c.name}">${c.name} (${c.empId})</option>`).join('');
+                contentHTML += `
+                    <div class="form-group" style="margin-bottom: 0.5rem;">
+                        <label for="bulk-collector-search">Search Collector (by Name or EM_No):</label>
+                        <input type="text" id="bulk-collector-search" class="form-control" placeholder="Search collectors in your district...">
+                    </div>
+                    <div class="form-group">
+                        <label for="bulk-collector-select">Data Collector Name</label>
+                        <select class="form-control" id="bulk-collector-select" required>
+                            <option value="">-- Select a Collector --</option>
+                        </select>
+                    </div>`;
+            }
+            
+            // Supervisor/District Dropdown for district-transfer
+            if (actionType === 'district-transfer') {
+                const supervisors = getSupervisors().filter(s => s.status === 'active' && s.id !== currentSupervisor.id);
+                const options = supervisors
+                                    .sort((a,b) => a.name.localeCompare(b.name))
+                                    .map(s => `<option value="${s.district}">${s.name} (${s.district})</option>`).join('');
                 contentHTML += `<div class="form-group">
-                                    <label for="bulk-collector-select">Data Collector Name</label>
-                                    <select class="form-control" id="bulk-collector-select" required>
-                                        <option value="">-- Select a Collector --</option>
+                                    <label for="bulk-supervisor-select">Destination Supervisor/District</label>
+                                    <select class="form-control" id="bulk-supervisor-select" required>
+                                        <option value="">-- Select a Destination --</option>
                                         ${options}
                                     </select>
                                 </div>`;
             }
+
              contentHTML += `<p>Select items below:</p><div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 0.5rem;">
                 ${config.items.map(item => `<div><input type="checkbox" id="bulk-item-${item.id}" value="${item.id}" style="margin-right:0.5rem;"><label for="bulk-item-${item.id}">${item.name} (${item.id})${item.assigned ? ' - Assigned to: ' + item.assigned : ''}</label></div>`).join('')}
             </div>`;
@@ -1155,6 +1230,11 @@
             modalContent.innerHTML = contentHTML;
             modal.style.display = 'flex';
             modal.dataset.actionType = actionType;
+
+            // Pre-populate collector dropdown if it exists
+            if (actionType === 'assign' || actionType === 'transfer') {
+                populateCollectorDropdown('bulk-collector-select');
+            }
         }
         
         function handleBulkActionConfirm() {
@@ -1168,10 +1248,16 @@
             let inventory = getInventoryData();
             let successCount = 0;
             let collectorName = '';
+            let destinationDistrict = '';
 
             if (actionType === 'assign' || actionType === 'transfer') {
                 collectorName = document.getElementById('bulk-collector-select').value;
                 if (!collectorName) { showNotification('Please select a data collector.'); return; }
+            }
+            
+            if (actionType === 'district-transfer') {
+                destinationDistrict = document.getElementById('bulk-supervisor-select').value;
+                if (!destinationDistrict) { showNotification('Please select a destination district.'); return; }
             }
 
             itemIds.forEach(itemId => {
@@ -1198,6 +1284,12 @@
                         case 'transfer': 
                             item.assigned = collectorName;
                              logMovement(itemId, `bulk_transfer`, `Item transferred from ${originalAssignee} to ${collectorName}`);
+                            break;
+                        case 'district-transfer': // NEW
+                            item.status = 'pending-transfer'; // Send for acknowledgement
+                            item.district = destinationDistrict; // Change district
+                            item.assigned = ''; // Clear local assignment
+                            logMovement(itemId, `bulk_district_transfer`, `Item transferred from ${currentSupervisor.district} to ${destinationDistrict}. Awaiting acknowledgement.`);
                             break;
                         case 'maintenance': 
                             item.status = 'maintenance'; 
@@ -1227,4 +1319,3 @@
     </script>
 </body>
 </html>
-

@@ -208,6 +208,8 @@
         .data-table th, .data-table td { padding: 1rem 1.25rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
         .data-table th { background-color: var(--light); font-weight: 600; color: var(--secondary); font-size: 0.9rem; }
         .data-table tbody tr:hover { background-color: #f8fafc; }
+        .data-table tbody tr.selected { background-color: #fee2e2; }
+        .data-table th:first-child, .data-table td:first-child { width: 1%; padding-right: 0.5rem; }
         .table-actions { display: flex; gap: 0.5rem; }
 
         /* Status & District Badges */
@@ -252,6 +254,7 @@
         .search-container { position: relative; flex-grow: 1; max-width: 400px; }
         .search-input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; }
         .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--secondary); }
+        .table-actions-buttons { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
         
         /* Settings Tabs */
         .settings-tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; flex-wrap: wrap;}
@@ -321,7 +324,8 @@
 
             <div class="settings-tabs">
                 <div class="settings-tab active" data-tab="users">User Management</div>
-                <div class="settings-tab" data-tab="admin">Admin Profile</div>
+                <div class="settings-tab" data-tab="myProfile">My Profile</div>
+                <div class="settings-tab" data-tab="admins">Admin Accounts</div>
                 <div class="settings-tab" data-tab="system">System Configuration</div>
             </div>
             
@@ -334,12 +338,26 @@
                                 <input type="text" class="search-input" placeholder="Search supervisors..." id="supervisorSearchInput">
                                 <i class="fas fa-search search-icon"></i>
                             </div>
-                             <button class="btn btn-primary" id="addSupervisorBtn"><i class="fas fa-plus"></i> Add Supervisor</button>
+                            <div class="table-actions-buttons">
+                                <button class="btn btn-danger" id="bulkDeleteSupervisorsBtn" style="display: none;">
+                                    <i class="fas fa-trash-alt"></i> Delete Selected
+                                </button>
+                                <button class="btn btn-primary" id="addSupervisorBtn"><i class="fas fa-plus"></i> Add Supervisor</button>
+                            </div>
                         </div>
                         <div id="supervisorAlert" class="alert"></div>
                         <div class="table-responsive">
                             <table class="data-table">
-                                <thead><tr><th>Supervisor Info</th><th>Contact</th><th>District</th><th>Status</th><th>Actions</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="selectAllSupervisors"></th>
+                                        <th>Supervisor Info</th>
+                                        <th>Contact</th>
+                                        <th>District</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="supervisorsTableBody"></tbody>
                             </table>
                         </div>
@@ -354,12 +372,26 @@
                                 <input type="text" class="search-input" placeholder="Search field officers..." id="fieldOfficerSearchInput">
                                 <i class="fas fa-search search-icon"></i>
                             </div>
-                             <button class="btn btn-primary" id="addFieldOfficerBtn"><i class="fas fa-plus"></i> Add Field Officer</button>
+                            <div class="table-actions-buttons">
+                                <button class="btn btn-danger" id="bulkDeleteFieldOfficersBtn" style="display: none;">
+                                    <i class="fas fa-trash-alt"></i> Delete Selected
+                                </button>
+                                <button class="btn btn-primary" id="addFieldOfficerBtn"><i class="fas fa-plus"></i> Add Field Officer</button>
+                            </div>
                         </div>
                         <div id="fieldOfficerAlert" class="alert"></div>
                         <div class="table-responsive">
                             <table class="data-table">
-                                <thead><tr><th>Field Officer Info</th><th>Contact</th><th>District</th><th>Status</th><th>Actions</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="selectAllFieldOfficers"></th>
+                                        <th>Field Officer Info</th>
+                                        <th>Contact</th>
+                                        <th>District</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="fieldOfficersTableBody"></tbody>
                             </table>
                         </div>
@@ -374,7 +406,10 @@
                                 <input type="text" class="search-input" placeholder="Search data collectors..." id="dataCollectorSearchInput">
                                 <i class="fas fa-search search-icon"></i>
                             </div>
-                            <div style="display: flex; gap: 0.5rem;">
+                            <div class="table-actions-buttons">
+                                <button class="btn btn-danger" id="bulkDeleteDataCollectorsBtn" style="display: none;">
+                                    <i class="fas fa-trash-alt"></i> Delete Selected
+                                </button>
                                 <button class="btn btn-primary" id="addDataCollectorBtn"><i class="fas fa-plus"></i> Add Collector</button>
                                 <button class="btn btn-outline" id="bulkUploadCollectorBtn"><i class="fas fa-upload"></i> Bulk Upload</button>
                             </div>
@@ -382,20 +417,27 @@
                         <div id="dataCollectorAlert" class="alert"></div>
                         <div class="table-responsive">
                             <table class="data-table">
-                                <thead><tr><th>Collector Info</th><th>Contact Info</th><th>Actions</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="selectAllDataCollectors"></th>
+                                        <th>Collector Info</th>
+                                        <th>Contact Info</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="dataCollectorsTableBody"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-                </div>
+            </div>
 
-            <div class="settings-content" id="adminTab">
+            <div class="settings-content" id="myProfileTab">
                 <div class="card">
-                    <div class="card-header"><h3>Change Admin Password</h3></div>
+                    <div class="card-header"><h3>Change My Password</h3></div>
                     <div class="card-body">
                         <div id="adminAlert" class="alert"></div>
-                        <p class="form-text">Note: The default admin username is 'admin' and cannot be changed. The default password is 'admin123'. For security, it's recommended to change it.</p>
+                        <p class="form-text">Note: You can only change the password for your own account. The primary 'admin' account cannot be deleted.</p>
                         <form id="adminPasswordForm">
                             <div class="form-group password-toggle">
                                 <label for="currentPassword">Current Password</label>
@@ -417,6 +459,31 @@
                                 Update Password
                             </button>
                         </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="settings-content" id="adminsTab">
+                <div class="card">
+                    <div class="card-header"><h3>Manage Admin Accounts</h3></div>
+                    <div class="card-body">
+                        <div class="table-controls">
+                             <p class="form-text" style="margin: 0; max-width: 600px;">Add or remove other admin accounts. The primary 'admin' account cannot be deleted.</p>
+                             <button class="btn btn-primary" id="addAdminBtn"><i class="fas fa-plus"></i> Add Admin</button>
+                        </div>
+                        <div id="adminAccountsAlert" class="alert"></div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Role</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminsTableBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -569,7 +636,6 @@
             </div>
         </div>
     </div>
-    
     <div class="modal" id="dataCollectorModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -629,6 +695,39 @@
             </div>
         </div>
     </div>
+
+    <div class="modal" id="adminModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="adminModalTitle">Add Admin Account</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="adminForm">
+                    <div class="form-group">
+                        <label for="adminUsername">Username *</label>
+                        <input type="text" class="form-control" id="adminUsername" required>
+                    </div>
+                    <div class="form-group password-toggle">
+                        <label for="adminPassword">Password *</label>
+                        <input type="password" class="form-control" id="adminPassword" required minlength="6">
+                        <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                        <div class="form-text">Password must be at least 6 characters.</div>
+                    </div>
+                    <div class="form-group password-toggle">
+                        <label for="adminConfirmPassword">Confirm Password *</label>
+                        <input type="password" class="form-control" id="adminConfirmPassword" required>
+                        <button type="button" class="toggle-password"><i class="fas fa-eye"></i></button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline modal-close">Cancel</button>
+                <button type="submit" form="adminForm" class="btn btn-primary">Save Admin</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="deleteModal">
         <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header"><h3>Confirm Deletion</h3><button class="modal-close">&times;</button></div>
@@ -654,7 +753,12 @@
             const FIELDOFFICERS_KEY = 'fieldOfficers';
             const DATACOLLECTORS_KEY = 'dataCollectors';
             const DISTRICTS_KEY = 'districts';
-            const ADMIN_CREDS_KEY = 'adminCredentials';
+            const ADMIN_ACCOUNTS_KEY = 'adminCredentials'; // Renamed, but keeping key for compatibility. Updated logic to treat as array.
+
+            // --- BULK SELECTION STATE ---
+            let selectedSupervisors = new Set();
+            let selectedFieldOfficers = new Set();
+            let selectedDataCollectors = new Set();
 
             // --- DATA HELPERS ---
             const getData = key => JSON.parse(localStorage.getItem(key)) || [];
@@ -668,13 +772,30 @@
                 initData(SUPERVISORS_KEY, () => [{ id: Date.now(), name: 'Default Supervisor', empId: 'SUP-001', email: 'sup.kagadi@rtv.org', phone: '0700123456', username: 'sup_kagadi', password: 'password123', district: 'Kagadi', status: 'active' }]);
                 initData(FIELDOFFICERS_KEY, () => [{ id: Date.now() + 1, name: 'Default Field Officer', empId: 'FO-001', email: 'fo.kyenjojo@rtv.org', phone: '0700654321', username: 'fo_kyenjojo', password: 'password123', district: 'Kyenjojo', status: 'active' }]);
                 initData(DATACOLLECTORS_KEY, () => [{ id: Date.now() + 2, name: 'Natuha Eve', empId: 'EM132', email: 'natuha@gmail.com', phone: '0700987654'}]);
-                initData(ADMIN_CREDS_KEY, () => ({ username: 'admin', password: 'admin123' }));
+                
+                // --- ADMIN ACCOUNTS INITIALIZATION (Updated) ---
+                const adminCreds = localStorage.getItem(ADMIN_ACCOUNTS_KEY);
+                if (!adminCreds) {
+                    // Initialize as an array with the primary admin
+                    localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify([{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]));
+                } else {
+                    // If it's the old object format, convert it to the new array format
+                    try {
+                        const parsed = JSON.parse(adminCreds);
+                        if (!Array.isArray(parsed)) {
+                            localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify([{ id: 1, username: parsed.username || 'admin', password: parsed.password || 'admin123', isPrimary: true }]));
+                        }
+                    } catch (e) {
+                         localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify([{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]));
+                    }
+                }
 
                 populateDistrictDropdowns();
                 renderSupervisorsTable();
                 renderFieldOfficersTable();
                 renderDataCollectorsTable();
                 renderDistrictsTable();
+                renderAdminsTable();
                 setupEventListeners();
             }
 
@@ -686,8 +807,11 @@
                 
                 const filtered = supervisors.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm)));
                 
-                tableBody.innerHTML = filtered.map(item => `
-                    <tr data-id="${item.id}">
+                tableBody.innerHTML = filtered.map(item => {
+                    const isSelected = selectedSupervisors.has(String(item.id));
+                    return `
+                    <tr data-id="${item.id}" class="${isSelected ? 'selected' : ''}">
+                        <td><input type="checkbox" class="supervisor-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''}></td>
                         <td>
                             <div><strong>${item.name}</strong></div>
                             <small style="color: var(--secondary);">ID: ${item.empId} | User: ${item.username}</small>
@@ -703,7 +827,8 @@
                             <button class="btn btn-sm btn-danger delete-supervisor-btn">Delete</button>
                         </td>
                     </tr>
-                `).join('') || `<tr><td colspan="5" style="text-align: center;">No supervisors found.</td></tr>`;
+                `}).join('') || `<tr><td colspan="6" style="text-align: center;">No supervisors found.</td></tr>`;
+                updateBulkActionUI('supervisor');
             }
 
             function renderFieldOfficersTable() {
@@ -713,8 +838,11 @@
 
                  const filtered = officers.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm)));
 
-                tableBody.innerHTML = filtered.map(item => `
-                    <tr data-id="${item.id}">
+                tableBody.innerHTML = filtered.map(item => {
+                    const isSelected = selectedFieldOfficers.has(String(item.id));
+                    return `
+                    <tr data-id="${item.id}" class="${isSelected ? 'selected' : ''}">
+                        <td><input type="checkbox" class="fieldOfficer-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''}></td>
                         <td>
                             <div><strong>${item.name}</strong></div>
                             <small style="color: var(--secondary);">ID: ${item.empId} | User: ${item.username || 'N/A'}</small>
@@ -730,7 +858,8 @@
                             <button class="btn btn-sm btn-danger delete-fieldOfficer-btn">Delete</button>
                         </td>
                     </tr>
-                `).join('') || `<tr><td colspan="5" style="text-align: center;">No field officers found.</td></tr>`;
+                `}).join('') || `<tr><td colspan="6" style="text-align: center;">No field officers found.</td></tr>`;
+                updateBulkActionUI('fieldOfficer');
             }
 
             function renderDataCollectorsTable() {
@@ -740,8 +869,11 @@
 
                 const filtered = collectors.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm)));
                 
-                tableBody.innerHTML = filtered.map(item => `
-                    <tr data-id="${item.id}">
+                tableBody.innerHTML = filtered.map(item => {
+                    const isSelected = selectedDataCollectors.has(String(item.id));
+                    return `
+                    <tr data-id="${item.id}" class="${isSelected ? 'selected' : ''}">
+                        <td><input type="checkbox" class="dataCollector-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''}></td>
                         <td>
                             <div><strong>${item.name}</strong></div>
                             <small style="color: var(--secondary);">EM_No: ${item.empId}</small>
@@ -755,7 +887,25 @@
                             <button class="btn btn-sm btn-danger delete-datacollector-btn">Delete</button>
                         </td>
                     </tr>
-                `).join('') || `<tr><td colspan="3" style="text-align: center;">No data collectors found.</td></tr>`;
+                `}).join('') || `<tr><td colspan="4" style="text-align: center;">No data collectors found.</td></tr>`;
+                updateBulkActionUI('dataCollector');
+            }
+
+            function renderAdminsTable() {
+                const admins = getData(ADMIN_ACCOUNTS_KEY);
+                const tableBody = document.getElementById('adminsTableBody');
+                tableBody.innerHTML = admins.map(admin => `
+                    <tr data-id="${admin.id}">
+                        <td>${admin.username}</td>
+                        <td>${admin.isPrimary ? 'Primary Admin' : 'Admin'}</td>
+                        <td class="table-actions">
+                            <button class="btn btn-sm btn-danger delete-admin-btn" 
+                                ${admin.isPrimary ? 'disabled title="Cannot delete primary admin"' : ''}>
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `).join('') || `<tr><td colspan="3" style="text-align: center;">No admin accounts found.</td></tr>`;
             }
 
             function renderDistrictsTable() {
@@ -797,22 +947,28 @@
                 document.getElementById('addSupervisorBtn').addEventListener('click', () => openUserModal('supervisor'));
                 document.getElementById('supervisorForm').addEventListener('submit', (e) => handleSaveUser(e, 'supervisor'));
                 document.getElementById('supervisorsTableBody').addEventListener('click', (e) => handleTableAction(e, 'supervisor'));
-                document.getElementById('supervisorSearchInput').addEventListener('input', renderSupervisorsTable);
-                
+                document.getElementById('supervisorSearchInput').addEventListener('input', () => { selectedSupervisors.clear(); renderSupervisorsTable(); });
+                document.getElementById('selectAllSupervisors').addEventListener('change', (e) => handleSelectAll(e, 'supervisor'));
+                document.getElementById('bulkDeleteSupervisorsBtn').addEventListener('click', () => handleBulkDelete('supervisor'));
+
                 // Field Officers
                 document.getElementById('addFieldOfficerBtn').addEventListener('click', () => openUserModal('fieldOfficer'));
                 document.getElementById('fieldOfficerForm').addEventListener('submit', (e) => handleSaveUser(e, 'fieldOfficer'));
                 document.getElementById('fieldOfficersTableBody').addEventListener('click', (e) => handleTableAction(e, 'fieldOfficer'));
-                document.getElementById('fieldOfficerSearchInput').addEventListener('input', renderFieldOfficersTable);
+                document.getElementById('fieldOfficerSearchInput').addEventListener('input', () => { selectedFieldOfficers.clear(); renderFieldOfficersTable(); });
+                document.getElementById('selectAllFieldOfficers').addEventListener('change', (e) => handleSelectAll(e, 'fieldOfficer'));
+                document.getElementById('bulkDeleteFieldOfficersBtn').addEventListener('click', () => handleBulkDelete('fieldOfficer'));
 
                 // Data Collectors
                 document.getElementById('addDataCollectorBtn').addEventListener('click', () => openDataCollectorModal());
                 document.getElementById('dataCollectorForm').addEventListener('submit', handleSaveDataCollector);
                 document.getElementById('dataCollectorsTableBody').addEventListener('click', handleDataCollectorTableAction);
-                document.getElementById('dataCollectorSearchInput').addEventListener('input', renderDataCollectorsTable);
+                document.getElementById('dataCollectorSearchInput').addEventListener('input', () => { selectedDataCollectors.clear(); renderDataCollectorsTable(); });
+                document.getElementById('selectAllDataCollectors').addEventListener('change', (e) => handleSelectAll(e, 'dataCollector'));
+                document.getElementById('bulkDeleteDataCollectorsBtn').addEventListener('click', () => handleBulkDelete('dataCollector'));
+                
                 document.getElementById('bulkUploadCollectorBtn').addEventListener('click', () => {
                     const modal = document.getElementById('bulkUploadCollectorModal');
-                    // Reset modal state before showing
                     const fileInput = modal.querySelector('#collector-file-upload');
                     if(fileInput) fileInput.value = '';
                     modal.querySelector('#upload-preview').style.display = 'none';
@@ -834,6 +990,11 @@
                         window.location.href = 'login.html';
                     }
                 });
+
+                // New Admin Accounts Listeners
+                document.getElementById('addAdminBtn').addEventListener('click', openAdminModal);
+                document.getElementById('adminForm').addEventListener('submit', handleSaveAdmin);
+                document.getElementById('adminsTableBody').addEventListener('click', handleDeleteAdminClick);
             }
             
             // --- MODAL & FORM HANDLERS ---
@@ -933,6 +1094,10 @@
 
             function handleDataCollectorTableAction(e) {
                 const btn = e.target.closest('button');
+                if (e.target.matches('.dataCollector-checkbox')) {
+                    handleCheckboxClick(e.target, 'dataCollector');
+                    return;
+                }
                 if (!btn) return;
                 const id = btn.closest('tr').dataset.id;
                 
@@ -993,11 +1158,14 @@
             }
             
             function handleTableAction(e, userType) {
+                if (e.target.matches(`.${userType}-checkbox`)) {
+                    handleCheckboxClick(e.target, userType);
+                    return;
+                }
                 const btn = e.target.closest('button');
                 if (!btn) return;
                 const id = btn.closest('tr').dataset.id;
                 
-                // Corrected class names to match the rendered HTML
                 if (btn.classList.contains(`edit-${userType}-btn`)) {
                     openUserModal(userType, id);
                 } else if (btn.classList.contains(`delete-${userType}-btn`)) {
@@ -1031,6 +1199,94 @@
                 modal.style.display = 'flex';
             }
 
+            // --- BULK ACTION HANDLERS ---
+            function handleCheckboxClick(checkbox, userType) {
+                const id = String(checkbox.dataset.id);
+                const selectedSet = getSelectedSet(userType);
+                const row = checkbox.closest('tr');
+                if (checkbox.checked) {
+                    selectedSet.add(id);
+                    row.classList.add('selected');
+                } else {
+                    selectedSet.delete(id);
+                    row.classList.remove('selected');
+                }
+                updateBulkActionUI(userType);
+            }
+
+            function handleSelectAll(e, userType) {
+                const isChecked = e.target.checked;
+                const selectedSet = getSelectedSet(userType);
+                const tableBody = document.getElementById(`${userType}sTableBody`);
+                
+                tableBody.querySelectorAll(`.${userType}-checkbox`).forEach(checkbox => {
+                    const id = String(checkbox.dataset.id);
+                    const row = checkbox.closest('tr');
+                    checkbox.checked = isChecked;
+                    if (isChecked) {
+                        selectedSet.add(id);
+                        row.classList.add('selected');
+                    } else {
+                        selectedSet.delete(id);
+                        row.classList.remove('selected');
+                    }
+                });
+                updateBulkActionUI(userType);
+            }
+
+            function handleBulkDelete(userType) {
+                const selectedSet = getSelectedSet(userType);
+                const count = selectedSet.size;
+                if (count === 0) return;
+
+                const userTypeName = userType === 'dataCollector' ? 'data collector(s)' : `${userType}(s)`;
+                if (confirm(`Are you sure you want to delete ${count} ${userTypeName}? This cannot be undone.`)) {
+                    const dataKey = `${userType}s`; // e.g., 'supervisors'
+                    let data = getData(dataKey);
+                    data = data.filter(item => !selectedSet.has(String(item.id)));
+                    saveData(dataKey, data);
+                    
+                    selectedSet.clear();
+                    
+                    if (userType === 'supervisor') renderSupervisorsTable();
+                    if (userType === 'fieldOfficer') renderFieldOfficersTable();
+                    if (userType === 'dataCollector') renderDataCollectorsTable();
+                    
+                    updateBulkActionUI(userType);
+                    showAlert(`${userType}Alert`, 'success', `${count} ${userTypeName} deleted successfully.`);
+                }
+            }
+
+            function getSelectedSet(userType) {
+                if (userType === 'supervisor') return selectedSupervisors;
+                if (userType === 'fieldOfficer') return selectedFieldOfficers;
+                if (userType === 'dataCollector') return selectedDataCollectors;
+                return new Set();
+            }
+
+            function updateBulkActionUI(userType) {
+                const selectedSet = getSelectedSet(userType);
+                const btn = document.getElementById(`bulkDelete${userType.charAt(0).toUpperCase() + userType.slice(1)}sBtn`);
+                const selectAllCheckbox = document.getElementById(`selectAll${userType.charAt(0).toUpperCase() + userType.slice(1)}s`);
+                const tableBody = document.getElementById(`${userType}sTableBody`);
+                
+                if (selectedSet.size > 0) {
+                    btn.style.display = 'inline-flex';
+                    btn.textContent = `Delete Selected (${selectedSet.size})`;
+                } else {
+                    btn.style.display = 'none';
+                }
+
+                // Update "Select All" checkbox state
+                const visibleCheckboxes = tableBody.querySelectorAll(`.${userType}-checkbox`);
+                if (visibleCheckboxes.length > 0) {
+                    selectAllCheckbox.checked = Array.from(visibleCheckboxes).every(cb => cb.checked);
+                } else {
+                    selectAllCheckbox.checked = false;
+                }
+            }
+            
+            // --- SYSTEM & ADMIN HANDLERS ---
             function handleAddDistrict(e) {
                 e.preventDefault();
                 const input = document.getElementById('newDistrictName');
@@ -1070,18 +1326,79 @@
                 const newPassword = document.getElementById('newPassword').value;
                 const confirmNewPassword = document.getElementById('confirmNewPassword').value;
 
-                const adminCreds = JSON.parse(localStorage.getItem(ADMIN_CREDS_KEY));
+                let adminAccounts = getData(ADMIN_ACCOUNTS_KEY);
+                const adminIndex = adminAccounts.findIndex(a => a.username === loggedInUser.username);
+                
+                if (adminIndex === -1) return showAlert('adminAlert', 'error', 'Could not find your user account.');
+                
+                const adminCreds = adminAccounts[adminIndex];
 
                 if (currentPassword !== adminCreds.password) return showAlert('adminAlert', 'error', 'Current password does not match.');
                 if (newPassword.length < 6) return showAlert('adminAlert', 'error', 'New password must be at least 6 characters.');
                 if (newPassword !== confirmNewPassword) return showAlert('adminAlert', 'error', 'New passwords do not match.');
                 
-                adminCreds.password = newPassword;
-                saveData(ADMIN_CREDS_KEY, adminCreds);
-                showAlert('adminAlert', 'success', 'Admin password updated successfully.');
+                adminAccounts[adminIndex].password = newPassword;
+                saveData(ADMIN_ACCOUNTS_KEY, adminAccounts);
+                showAlert('adminAlert', 'success', 'Your password has been updated successfully.');
                 e.target.reset();
             }
             
+            function openAdminModal() {
+                document.getElementById('adminForm').reset();
+                document.getElementById('adminModal').style.display = 'flex';
+            }
+            
+            function handleSaveAdmin(e) {
+                e.preventDefault();
+                const username = document.getElementById('adminUsername').value.trim().toLowerCase();
+                const password = document.getElementById('adminPassword').value;
+                const confirmPassword = document.getElementById('adminConfirmPassword').value;
+                
+                if (!username || !password || !confirmPassword) return showAlert('adminAccountsAlert', 'error', 'All fields are required.');
+                if (password.length < 6) return showAlert('adminAccountsAlert', 'error', 'Password must be at least 6 characters.');
+                if (password !== confirmPassword) return showAlert('adminAccountsAlert', 'error', 'Passwords do not match.');
+                
+                let adminAccounts = getData(ADMIN_ACCOUNTS_KEY);
+                if (adminAccounts.some(a => a.username === username)) {
+                    return showAlert('adminAccountsAlert', 'error', 'That username is already taken.');
+                }
+                
+                adminAccounts.push({
+                    id: Date.now(),
+                    username: username,
+                    password: password,
+                    isPrimary: false
+                });
+                
+                saveData(ADMIN_ACCOUNTS_KEY, adminAccounts);
+                renderAdminsTable();
+                showAlert('adminAccountsAlert', 'success', 'New admin account added successfully.');
+                document.getElementById('adminModal').style.display = 'none';
+            }
+
+            function handleDeleteAdminClick(e) {
+                const btn = e.target.closest('.delete-admin-btn');
+                if (!btn || btn.disabled) return;
+                
+                const adminId = btn.closest('tr').dataset.id;
+                let adminAccounts = getData(ADMIN_ACCOUNTS_KEY);
+                const admin = adminAccounts.find(a => a.id == adminId);
+
+                if (!admin) return;
+                if (admin.isPrimary) {
+                    showAlert('adminAccountsAlert', 'error', 'Cannot delete the primary admin account.');
+                    return;
+                }
+                
+                const deleteCallback = () => {
+                    adminAccounts = adminAccounts.filter(a => a.id != adminId);
+                    saveData(ADMIN_ACCOUNTS_KEY, adminAccounts);
+                    renderAdminsTable();
+                    showAlert('adminAccountsAlert', 'success', `Admin '${admin.username}' deleted successfully.`);
+                };
+                openDeleteModal(`the admin account '${admin.username}'`, deleteCallback);
+            }
+
             function setupBulkUploadCollector() {
                 const modal = document.getElementById('bulkUploadCollectorModal');
                 const fileInput = document.getElementById('collector-file-upload');

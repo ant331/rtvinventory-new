@@ -746,21 +746,18 @@
         const selectAllCheckbox = document.getElementById('select-all-checkbox');
 
         // --- DATA INITIALIZATION ---
+        // --- MODIFIED: Removed seeding for 'districts' and 'supervisors' ---
         function initializeData() {
-            // This function ensures that essential data exists in localStorage, preventing errors.
-            if (!localStorage.getItem('districts')) {
-                const defaultDistricts = ["Kagadi", "Kibaale", "Kyenjojo", "Kyegegwa", "Mbarara"];
-                localStorage.setItem('districts', JSON.stringify(defaultDistricts));
-            }
-            if (!localStorage.getItem('supervisors')) {
-                const sampleSupervisors = [{
-                    id: 1,
-                    name: 'John Smith',
-                    district: 'Kagadi',
-                    status: 'active',
-                    password: 'password123'
-                }];
-                localStorage.setItem('supervisors', JSON.stringify(sampleSupervisors));
+            // This function now only seeds sample inventory if it's missing.
+            // User and district data is now ONLY seeded by login.html
+            if (!localStorage.getItem('inventoryData')) {
+                const today = new Date().toLocaleDateString();
+                const sampleInventory = [
+                    { id: 'TBL-0421', name: 'iPad Pro 12.9"', type: 'tablet', status: 'available', assigned: '', district: 'mbarara', lastUpdate: today, notes: '' },
+                    { id: 'PHN-1872', name: 'Samsung Galaxy S21', type: 'phone', status: 'in-use', assigned: 'John Smith', district: 'Kagadi', lastUpdate: today, notes: '' },
+                    { id: 'CHG-9901', name: 'Anker PowerCore', type: 'charger', status: 'pending-approval', assigned: '', district: 'mbarara', lastUpdate: today, notes: 'Returned from Kyenjojo' }
+                ];
+                localStorage.setItem('inventoryData', JSON.stringify(sampleInventory));
             }
         }
 
@@ -779,7 +776,8 @@
 
         function loadData() {
             try {
-                inventory = JSON.parse(localStorage.getItem('inventoryData')) || getSampleData();
+                // We no longer call getSampleData() here, as login.html is the source of truth
+                inventory = JSON.parse(localStorage.getItem('inventoryData')) || []; 
                 movementLogs = JSON.parse(localStorage.getItem('movementLogs')) || [];
 
                 let wasModified = false;
@@ -797,8 +795,8 @@
                 }
 
             } catch (e) {
-                console.error("Failed to parse data from localStorage. Using sample data.", e);
-                inventory = getSampleData();
+                console.error("Failed to parse data from localStorage.", e);
+                inventory = [];
                 movementLogs = [];
             }
         }
@@ -809,14 +807,7 @@
             window.dispatchEvent(new Event('storage'));
         }
 
-        function getSampleData() {
-            const today = new Date().toLocaleDateString();
-            return [
-                { id: 'TBL-0421', name: 'iPad Pro 12.9"', type: 'tablet', status: 'available', assigned: '', district: 'mbarara', lastUpdate: today, notes: '' },
-                { id: 'PHN-1872', name: 'Samsung Galaxy S21', type: 'phone', status: 'in-use', assigned: 'John Smith', district: 'Kagadi', lastUpdate: today, notes: '' },
-                { id: 'CHG-9901', name: 'Anker PowerCore', type: 'charger', status: 'pending-approval', assigned: '', district: 'mbarara', lastUpdate: today, notes: 'Returned from Kyenjojo' }
-            ];
-        }
+        // --- REMOVED getSampleData() function as it's no longer needed here ---
 
         function generateId(type) {
             let prefix = (type || 'GEN').substring(0, 3).toUpperCase();
@@ -908,7 +899,6 @@
             updateSelectAllCheckboxState();
         }
         
-        // --- MODIFICATION START: Updated stats calculation logic ---
         function updateStats() {
             // Calculate stats based on the full inventory list
             const totalItems = inventory.length;
@@ -939,7 +929,6 @@
                 document.getElementById(`${typeId}-available`).textContent = available;
             });
         }
-        // --- MODIFICATION END ---
 
         function filterInventory() {
             const searchTerm = searchBox.value.toLowerCase();
@@ -1288,9 +1277,9 @@
         }
 
         function initApp() {
-            initializeData(); // Ensure required data is available
-            loadData();
-            populateDropdowns();
+            initializeData(); // Ensure sample inventory is available
+            loadData(); // Load all data
+            populateDropdowns(); // Populate dropdowns with user/district data (from login seeder)
             setupEventListeners();
             updateAllViews();
         }

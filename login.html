@@ -147,6 +147,19 @@
     </style>
 </head>
 <body>
+    <script>
+        // --- AUTO-REDIRECT IF ALREADY LOGGED IN ---
+        // MOVED TO TOP of <body> to run before rendering the form
+        const loggedInUser = JSON.parse(sessionStorage.getItem('loggedInUser'));
+        if (loggedInUser) {
+            const roleRedirects = {
+                'admin': 'index.html',
+                'supervisor': 'supervisor.html',
+                'field_officer': 'field_office.html'
+            };
+            window.location.href = roleRedirects[loggedInUser.role] || 'login.html';
+        }
+    </script>
     <div class="login-container">
         <img src="black.png" alt="RTV Inventory Hub Logo" class="login-logo">
         <h1>Welcome Back</h1>
@@ -173,138 +186,128 @@
     </div>
 
     <script>
-        // --- AUTO-REDIRECT IF ALREADY LOGGED IN ---
-        const loggedInUser = JSON.parse(sessionStorage.getItem('loggedInUser'));
-        if (loggedInUser) {
-            const roleRedirects = {
-                'admin': 'index.html',
-                'supervisor': 'supervisor.html',
-                'field_officer': 'field_office.html'
-            };
-            window.location.href = roleRedirects[loggedInUser.role] || 'login.html';
-        }
+        // --- REMOVED 'DOMContentLoaded' WRAPPER ---
+        // This code now runs immediately, after the HTML above has been parsed.
         
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- DATA SEEDING FOR FIRST-TIME USE ---
-            function initializeDefaultData() {
-                const init = (key, data) => !localStorage.getItem(key) && localStorage.setItem(key, JSON.stringify(data));
-                
-                init('districts', ["Kagadi", "Kibaale", "Kyenjojo", "Kyegegwa", "Mbarara"]);
-                init('supervisors', [{ id: 1, name: 'Default Supervisor', username: 'kagadi', district: 'Kagadi', status: 'active', password: '12345678' }]);
-                init('fieldOfficers', [{ id: 2, name: 'Default Field Officer', username: 'kyenjojo', district: 'Kyenjojo', status: 'active', password: 'rtvfield' }]);
-                
-                // --- ADMIN ACCOUNTS INITIALIZATION (Updated) ---
-                const adminCredsKey = 'adminCredentials';
-                const adminCreds = localStorage.getItem(adminCredsKey);
-                if (!adminCreds) {
-                    init(adminCredsKey, [{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]);
-                } else {
-                    try {
-                        const parsed = JSON.parse(adminCreds);
-                        if (!Array.isArray(parsed)) {
-                            // Convert old object format to new array format
-                            init(adminCredsKey, [{ id: 1, username: parsed.username || 'admin', password: parsed.password || 'admin123', isPrimary: true }]);
-                        }
-                    } catch (e) {
-                         init(adminCredsKey, [{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]);
+        // --- DATA SEEDING FOR FIRST-TIME USE ---
+        function initializeDefaultData() {
+            const init = (key, data) => !localStorage.getItem(key) && localStorage.setItem(key, JSON.stringify(data));
+            
+            init('districts', ["Kagadi", "Kibaale", "Kyenjojo", "Kyegegwa", "Mbarara"]);
+            init('supervisors', [{ id: 1, name: 'Default Supervisor', username: 'kagadi', district: 'Kagadi', status: 'active', password: '12345678' }]);
+            init('fieldOfficers', [{ id: 2, name: 'Default Field Officer', username: 'kyenjojo', district: 'Kyenjojo', status: 'active', password: 'rtvfield' }]);
+            
+            // --- ADMIN ACCOUNTS INITIALIZATION (Updated) ---
+            const adminCredsKey = 'adminCredentials';
+            const adminCreds = localStorage.getItem(adminCredsKey);
+            if (!adminCreds) {
+                init(adminCredsKey, [{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]);
+            } else {
+                try {
+                    const parsed = JSON.parse(adminCreds);
+                    if (!Array.isArray(parsed)) {
+                        // Convert old object format to new array format
+                        init(adminCredsKey, [{ id: 1, username: parsed.username || 'admin', password: parsed.password || 'admin123', isPrimary: true }]);
                     }
+                } catch (e) {
+                     init(adminCredsKey, [{ id: 1, username: 'admin', password: 'admin123', isPrimary: true }]);
                 }
-                
-                init('adminNotifications', []); // Ensure notifications array exists
             }
-            initializeDefaultData();
-
-            // --- DOM ELEMENT REFERENCES ---
-            const loginForm = document.getElementById('login-form');
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            const errorMessage = document.getElementById('error-message');
-            const forgotPasswordLink = document.getElementById('forgot-password-link');
             
-            // --- LOGIN FORM SUBMISSION HANDLER ---
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                errorMessage.style.display = 'none';
-                
-                const username = usernameInput.value.trim().toLowerCase();
-                const password = passwordInput.value;
+            init('adminNotifications', []); // Ensure notifications array exists
+        }
+        initializeDefaultData();
 
-                // --- AUTHENTICATION LOGIC ---
-                
-                // 1. Check for Admin (Updated)
-                const adminAccounts = JSON.parse(localStorage.getItem('adminCredentials')) || [];
-                const adminUser = adminAccounts.find(a => a.username === username && a.password === password);
-                if (adminUser) {
-                    loginSuccess({ username: adminUser.username, role: 'admin' }, 'index.html');
-                    return;
-                }
-
-                // 2. Check for Supervisor
-                const supervisors = JSON.parse(localStorage.getItem('supervisors')) || [];
-                const supervisorUser = supervisors.find(s => 
-                    s.username === username &&
-                    s.password === password &&
-                    s.status === 'active'
-                );
-                if (supervisorUser) {
-                    loginSuccess({ username: supervisorUser.name, role: 'supervisor', district: supervisorUser.district }, 'supervisor.html');
-                    return;
-                }
-                
-                // 3. Check for Field Officer
-                const fieldOfficers = JSON.parse(localStorage.getItem('fieldOfficers')) || [];
-                const fieldOfficerUser = fieldOfficers.find(fo =>
-                    fo.username === username &&
-                    fo.password === password &&
-                    fo.status === 'active'
-                );
-                if (fieldOfficerUser) {
-                    loginSuccess({ username: fieldOfficerUser.name, role: 'field_officer', district: fieldOfficerUser.district }, 'field_office.html');
-                    return;
-                }
-
-                // 4. If no user found
-                showError('Invalid credentials or inactive account. Please try again.');
-            });
-
-            // --- NEW: FORGOT PASSWORD CLICK HANDLER ---
-            forgotPasswordLink.addEventListener('click', (e) => {
-                e.preventDefault();
-
-                const username = prompt("Please enter your username to request a password reset:");
-
-                if (username && username.trim() !== '') {
-                    const notifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-                    
-                    const newNotification = {
-                        id: `notif-reset-${Date.now()}`,
-                        message: `Password reset requested for user: <strong>${username.trim()}</strong>. Please contact them to resolve.`,
-                        timestamp: new Date().toISOString(),
-                        read: false,
-                        type: 'password_reset', // Custom type for this event
-                        itemId: username.trim() // Storing username for context
-                    };
-
-                    notifications.unshift(newNotification);
-                    localStorage.setItem('adminNotifications', JSON.stringify(notifications));
-
-                    alert('A password reset request has been sent to the administrator. They will contact you to resolve the issue.');
-                } else if (username !== null) { // User clicked OK but left it empty
-                    alert('Username cannot be empty.');
-                }
-            });
+        // --- DOM ELEMENT REFERENCES ---
+        const loginForm = document.getElementById('login-form');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const errorMessage = document.getElementById('error-message');
+        const forgotPasswordLink = document.getElementById('forgot-password-link');
+        
+        // --- LOGIN FORM SUBMISSION HANDLER ---
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            errorMessage.style.display = 'none';
             
-            // --- HELPER FUNCTIONS ---
-            function loginSuccess(userData, redirectUrl) {
-                sessionStorage.setItem('loggedInUser', JSON.stringify(userData));
-                window.location.href = redirectUrl;
+            const username = usernameInput.value.trim().toLowerCase();
+            const password = passwordInput.value;
+
+            // --- AUTHENTICATION LOGIC ---
+            
+            // 1. Check for Admin (Updated)
+            const adminAccounts = JSON.parse(localStorage.getItem('adminCredentials')) || [];
+            const adminUser = adminAccounts.find(a => a.username === username && a.password === password);
+            if (adminUser) {
+                loginSuccess({ username: adminUser.username, role: 'admin' }, 'index.html');
+                return;
             }
 
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
+            // 2. Check for Supervisor
+            const supervisors = JSON.parse(localStorage.getItem('supervisors')) || [];
+            const supervisorUser = supervisors.find(s => 
+                s.username === username &&
+                s.password === password &&
+                s.status === 'active'
+            );
+            if (supervisorUser) {
+                loginSuccess({ username: supervisorUser.name, role: 'supervisor', district: supervisorUser.district }, 'supervisor.html');
+                return;
+            }
+            
+            // 3. Check for Field Officer
+            const fieldOfficers = JSON.parse(localStorage.getItem('fieldOfficers')) || [];
+            const fieldOfficerUser = fieldOfficers.find(fo =>
+                fo.username === username &&
+                fo.password === password &&
+                fo.status === 'active'
+            );
+            if (fieldOfficerUser) {
+                loginSuccess({ username: fieldOfficerUser.name, role: 'field_officer', district: fieldOfficerUser.district }, 'field_office.html');
+                return;
+            }
+
+            // 4. If no user found
+            showError('Invalid credentials or inactive account. Please try again.');
+        });
+
+        // --- NEW: FORGOT PASSWORD CLICK HANDLER ---
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            const username = prompt("Please enter your username to request a password reset:");
+
+            if (username && username.trim() !== '') {
+                const notifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+                
+                const newNotification = {
+                    id: `notif-reset-${Date.now()}`,
+                    message: `Password reset requested for user: <strong>${username.trim()}</strong>. Please contact them to resolve.`,
+                    timestamp: new Date().toISOString(),
+                    read: false,
+                    type: 'password_reset', // Custom type for this event
+                    itemId: username.trim() // Storing username for context
+                };
+
+                notifications.unshift(newNotification);
+                localStorage.setItem('adminNotifications', JSON.stringify(notifications));
+
+                alert('A password reset request has been sent to the administrator. They will contact you to resolve the issue.');
+            } else if (username !== null) { // User clicked OK but left it empty
+                alert('Username cannot be empty.');
             }
         });
+        
+        // --- HELPER FUNCTIONS ---
+        function loginSuccess(userData, redirectUrl) {
+            sessionStorage.setItem('loggedInUser', JSON.stringify(userData));
+            window.location.href = redirectUrl;
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
     </script>
 </body>
 </html>
